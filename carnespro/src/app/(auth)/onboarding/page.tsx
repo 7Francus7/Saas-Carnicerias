@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Beef, Store } from "lucide-react";
 import { orgClient } from "@/lib/auth-client";
-import { createOrganizationWithDefaults } from "@/actions/onboarding";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -19,14 +18,24 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const result = await createOrganizationWithDefaults(nombre.trim());
+      const slug = nombre
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+      const result = await orgClient.create({ name: nombre.trim(), slug });
       if (result.error) {
-        setError(result.error ?? "Error al crear la carnicería");
+        setError(result.error.message ?? "Error al crear la carnicería");
         return;
       }
 
-      router.push("/");
-      router.refresh();
+      await orgClient.setActive({ organizationId: result.data!.id });
+
+      await fetch("/api/onboarding", { method: "POST" });
+
+      window.location.href = "/";
     } catch {
       setError("Error inesperado, intentá de nuevo");
     } finally {

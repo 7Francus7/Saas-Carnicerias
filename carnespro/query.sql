@@ -1,0 +1,1 @@
+SELECT email, role FROM "user" WHERE email = 'dellorsif@gmail.com';
