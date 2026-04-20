@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Beef, Eye, EyeOff } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -35,17 +35,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-card">
-      <div className="auth-logo">
-        <div className="sidebar__logo-icon">
-          <Beef size={24} color="white" />
-        </div>
-        <span className="auth-logo-text">Carnes<span>Pro</span></span>
-      </div>
-
-      <h1 className="auth-title">Iniciar sesión</h1>
-      <p className="auth-subtitle">Accedé a tu carnicería</p>
-
+    <>
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-field">
           <label className="auth-label">Email</label>
@@ -92,6 +82,26 @@ export default function LoginPage() {
         ¿No tenés cuenta?{" "}
         <Link href="/signup" className="auth-link">Registrate gratis</Link>
       </p>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="auth-card">
+      <div className="auth-logo">
+        <div className="sidebar__logo-icon">
+          <Beef size={24} color="white" />
+        </div>
+        <span className="auth-logo-text">Carnes<span>Pro</span></span>
+      </div>
+
+      <h1 className="auth-title">Iniciar sesión</h1>
+      <p className="auth-subtitle">Accedé a tu carnicería</p>
+
+      <Suspense>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }
