@@ -143,7 +143,6 @@ function OrgsTable({ orgs }: { orgs: Org[] }) {
             </table>
           </div>
         )}
-      </div>
     </div>
   );
 }
