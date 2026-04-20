@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Beef, Store } from "lucide-react";
 import { orgClient } from "@/lib/auth-client";
+import { createOrganizationWithDefaults } from "@/actions/onboarding";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -18,21 +19,12 @@ export default function OnboardingPage() {
     setLoading(true);
 
     try {
-      const slug = nombre
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-
-      const result = await orgClient.create({ name: nombre.trim(), slug });
+      const result = await createOrganizationWithDefaults(nombre.trim());
       if (result.error) {
-        setError(result.error.message ?? "Error al crear la carnicería");
+        setError(result.error ?? "Error al crear la carnicería");
         return;
       }
 
-      // Set as active organization
-      await orgClient.setActive({ organizationId: result.data!.id });
       router.push("/");
       router.refresh();
     } catch {
