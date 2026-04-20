@@ -40,7 +40,7 @@ export default function Sidebar() {
     : permissions;
 
   const userName = session?.user?.name ?? "Usuario";
-  const orgName = (session as any)?.session?.activeOrganizationId ? "Mi Carnicería" : "CarnesPro";
+  const orgName = (session as any)?.session?.activeOrganizationId ? "Mi Carnicería" : "Carnify";
   const iniciales = userName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
 
   const canAccess = (sectionKey: string) => {

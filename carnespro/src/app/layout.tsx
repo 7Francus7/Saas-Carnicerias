@@ -3,7 +3,7 @@ import "./globals.css";
 import ThemeProvider from "@/components/layout/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "CarnesPro — Sistema de Gestión para Carnicerías",
+  title: "Carnify — Sistema de Gestión para Carnicerías",
   description: "El sistema más completo para gestionar tu carnicería. Control de ventas, stock, desposte, costos y más.",
   icons: {
     icon: "/favicon.ico",

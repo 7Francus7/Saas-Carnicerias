@@ -48,6 +48,6 @@ export const useSettingsStore = create<SettingsState>()(
       updatePos: (data) =>
         set((s) => ({ pos: { ...s.pos, ...data } })),
     }),
-    { name: 'carnespro-settings' }
+    { name: 'carnify-settings' }
   )
 );

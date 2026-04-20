@@ -44,7 +44,7 @@ export default function DashboardEmpty() {
           color: "var(--text-primary)",
           marginBottom: 8,
         }}>
-          ¡Bienvenido a CarnesPro!
+          ¡Bienvenido a Carnify!
         </h2>
 
         <p style={{

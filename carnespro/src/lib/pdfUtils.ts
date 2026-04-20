@@ -48,7 +48,7 @@ export async function downloadComprobantePago(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(255, 255, 255);
-  doc.text('CARNESPRO', w / 2, y, { align: 'center' });
+  doc.text('CARNIFY', w / 2, y, { align: 'center' });
   y += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
@@ -146,7 +146,7 @@ export async function downloadComprobantePago(
   y += 4;
   doc.text('Documento informativo — no válido como factura', w / 2, y, { align: 'center' });
   y += 3;
-  doc.text('CARNESPro © 2026', w / 2, y, { align: 'center' });
+  doc.text('Carnify © 2026', w / 2, y, { align: 'center' });
 
   const filename = `comprobante-${client.name.replace(/\s+/g, '-').toLowerCase()}-${movement.id.slice(-6)}.pdf`;
   doc.save(filename);
@@ -187,7 +187,7 @@ export async function downloadCartola(client: ClientProfile) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   setTxt(WHITE);
-  doc.text('CARNESPRO', mg, 16);
+  doc.text('CARNIFY', mg, 16);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);

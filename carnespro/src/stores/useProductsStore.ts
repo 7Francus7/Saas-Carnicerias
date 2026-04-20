@@ -34,6 +34,6 @@ export const useProductsStore = create<ProductsState>()(
       deleteProduct: (id) =>
         set((s) => ({ products: s.products.filter((p) => p.id !== id) })),
     }),
-    { name: 'carnespro-products' }
+    { name: 'carnify-products' }
   )
 );

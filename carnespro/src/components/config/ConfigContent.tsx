@@ -28,22 +28,22 @@ const TABS: { id: TabId; label: string; Icon: React.ComponentType<{ size?: numbe
 ];
 
 const STORE_KEYS = [
-  "carnespro-settings",
-  "carnespro-theme",
-  "carnespro-products",
-  "carnespro-clients",
-  "carnespro-costos",
+  "carnify-settings",
+  "carnify-theme",
+  "carnify-products",
+  "carnify-clients",
+  "carnify-costos",
   "staff-storage",
 ] as const;
 
 type StoreKey = (typeof STORE_KEYS)[number];
 
 const STORE_LABELS: Record<StoreKey, string> = {
-  "carnespro-settings": "Configuración",
-  "carnespro-theme": "Apariencia",
-  "carnespro-products": "Productos",
-  "carnespro-clients": "Clientes",
-  "carnespro-costos": "Costos",
+  "carnify-settings": "Configuración",
+  "carnify-theme": "Apariencia",
+  "carnify-products": "Productos",
+  "carnify-clients": "Clientes",
+  "carnify-costos": "Costos",
   "staff-storage": "Personal",
 };
 
@@ -115,7 +115,7 @@ export default function ConfigContent() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
-    a.download = `carnespro-backup-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `carnify-backup-${new Date().toISOString().split("T")[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -549,7 +549,7 @@ export default function ConfigContent() {
               </div>
 
               {(STORE_KEYS.filter(
-                (k) => k !== "carnespro-theme" && k !== "carnespro-settings"
+                (k) => k !== "carnify-theme" && k !== "carnify-settings"
               ) as StoreKey[]).map((key) => (
                 <div key={key} className="config-setting-row">
                   <div>
@@ -584,7 +584,7 @@ export default function ConfigContent() {
               <div className="config-about-header">
                 <div className="config-about-emoji">🥩</div>
                 <div>
-                  <div className="config-about-name">CarnesPro</div>
+                  <div className="config-about-name">Carnify</div>
                   <div className="config-about-version">v1.0.0</div>
                 </div>
               </div>

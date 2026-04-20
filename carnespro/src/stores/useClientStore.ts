@@ -219,7 +219,7 @@ export const useClientStore = create<ClientState>()(
       })),
     }),
     {
-      name: 'carnespro-clients-v2',
+      name: 'carnify-clients-v2',
       partialize: (state) => ({ clients: state.clients })
     }
   )

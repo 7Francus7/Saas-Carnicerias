@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
-const SEED_SECRET = "carnespro-reset-2026";
+const SEED_SECRET = "carnify-reset-2026";
 const ADMIN_EMAIL = "dellorsif@gmail.com";
 const ADMIN_PASSWORD = "Admin1234!";
 const ADMIN_NAME = "Francesco (Admin)";

@@ -34,6 +34,6 @@ export const useCostosStore = create<CostosState>()(
           return { costs: next };
         }),
     }),
-    { name: 'carnespro-costos' }
+    { name: 'carnify-costos' }
   )
 );

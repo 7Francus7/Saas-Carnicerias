@@ -66,7 +66,7 @@ export default function SuperAdminView({ orgs: initialOrgs, users: initialUsers,
           </div>
           <div>
             <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Panel Super Admin</h1>
-            <p style={{ color: "#555", margin: 0, fontSize: "0.8rem" }}>CarnesPro · Gestión global</p>
+            <p style={{ color: "#555", margin: 0, fontSize: "0.8rem" }}>Carnify · Gestión global</p>
           </div>
         </div>
         <button

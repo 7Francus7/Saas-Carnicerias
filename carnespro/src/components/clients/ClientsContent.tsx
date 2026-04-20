@@ -206,7 +206,7 @@ export default function ClientsContent() {
     return (
       <div className="receipt-card">
         <div className="receipt-header">
-          <div className="receipt-logo">🥩 CARNESPRO</div>
+          <div className="receipt-logo">🥩 CARNIFY</div>
           <div className="receipt-title">COMPROBANTE DE PAGO</div>
           <div className="receipt-meta">
             N° {movement.id.slice(-8).toUpperCase()}

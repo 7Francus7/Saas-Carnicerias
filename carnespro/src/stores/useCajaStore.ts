@@ -157,6 +157,6 @@ export const useCajaStore = create<CajaStore>()(
         });
       },
     }),
-    { name: 'carnespro-caja' }
+    { name: 'carnify-caja' }
   )
 );

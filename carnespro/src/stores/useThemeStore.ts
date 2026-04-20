@@ -13,6 +13,6 @@ export const useThemeStore = create<ThemeState>()(
       toggleTheme: () =>
         set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
     }),
-    { name: 'carnespro-theme' }
+    { name: 'carnify-theme' }
   )
 );
