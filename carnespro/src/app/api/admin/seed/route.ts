@@ -45,10 +45,6 @@ export async function GET(req: NextRequest) {
       body: { name: ADMIN_NAME, email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     });
 
-    if (result.error) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
     // 3. Promote to admin role
     await prisma.user.update({
       where: { email: ADMIN_EMAIL },
