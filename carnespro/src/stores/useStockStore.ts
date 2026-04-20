@@ -17,10 +17,7 @@ export interface StockState {
 }
 
 export const useStockStore = create<StockState>((set) => ({
-  movements: [
-    { id: '1', date: '2024-04-16T10:30:00', type: 'entry', productName: 'Vacío', quantity: 120, unit: 'kg', supplier: 'Frigorífico Martínez', note: 'Ingreso semanal' },
-    { id: '2', date: '2024-04-16T11:15:00', type: 'exit', productName: 'Pollo entero', quantity: 5, unit: 'un', note: 'Venta ticket #V-0064' },
-  ],
+  movements: [],
   addMovement: (movement) => set((state) => ({ 
     movements: [movement, ...state.movements] 
   })),

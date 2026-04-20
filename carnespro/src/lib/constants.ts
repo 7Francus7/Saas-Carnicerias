@@ -49,110 +49,20 @@ export const PRODUCT_CATEGORIES = [
 
 // ── Mock data for Dashboard ──
 export const MOCK_STATS = {
-  revenue: {
-    value: 847520,
-    trend: 12.5,
-    trendDirection: "up" as const,
-    label: "Ventas del Día",
-  },
-  orders: {
-    value: 64,
-    trend: 8.3,
-    trendDirection: "up" as const,
-    label: "Transacciones",
-  },
-  avgTicket: {
-    value: 13242,
-    trend: -2.1,
-    trendDirection: "down" as const,
-    label: "Ticket Promedio",
-  },
-  clients: {
-    value: 38,
-    trend: 15.2,
-    trendDirection: "up" as const,
-    label: "Clientes Atendidos",
-  },
+  revenue: { value: 0, trend: 0, trendDirection: "up" as const, label: "Ventas del Día" },
+  orders: { value: 0, trend: 0, trendDirection: "up" as const, label: "Transacciones" },
+  avgTicket: { value: 0, trend: 0, trendDirection: "down" as const, label: "Ticket Promedio" },
+  clients: { value: 0, trend: 0, trendDirection: "up" as const, label: "Clientes Atendidos" },
 };
 
-export const MOCK_HOURLY_SALES = [
-  { hour: "08:00", ventas: 45200, transacciones: 4 },
-  { hour: "09:00", ventas: 78300, transacciones: 7 },
-  { hour: "10:00", ventas: 125400, transacciones: 12 },
-  { hour: "11:00", ventas: 156800, transacciones: 15 },
-  { hour: "12:00", ventas: 189200, transacciones: 18 },
-  { hour: "13:00", ventas: 142600, transacciones: 14 },
-  { hour: "14:00", ventas: 98500, transacciones: 9 },
-  { hour: "15:00", ventas: 67300, transacciones: 6 },
-  { hour: "16:00", ventas: 112400, transacciones: 11 },
-  { hour: "17:00", ventas: 134700, transacciones: 13 },
-  { hour: "18:00", ventas: 167800, transacciones: 16 },
-  { hour: "19:00", ventas: 89400, transacciones: 8 },
-];
-
-export const MOCK_WEEKLY_SALES = [
-  { day: "Lun", ventas: 680000, cantidad: 58 },
-  { day: "Mar", ventas: 720000, cantidad: 62 },
-  { day: "Mié", ventas: 590000, cantidad: 51 },
-  { day: "Jue", ventas: 810000, cantidad: 70 },
-  { day: "Vie", ventas: 950000, cantidad: 82 },
-  { day: "Sáb", ventas: 1250000, cantidad: 108 },
-  { day: "Dom", ventas: 430000, cantidad: 37 },
-];
-
-export const MOCK_TOP_PRODUCTS = [
-  { id: 1, name: "Vacío", category: "Vacuno", emoji: "🥩", sold: 42.5, unit: "kg", revenue: 382500, margin: 35 },
-  { id: 2, name: "Asado de tira", category: "Vacuno", emoji: "🥩", sold: 38.2, unit: "kg", revenue: 305600, margin: 32 },
-  { id: 3, name: "Entraña", category: "Vacuno", emoji: "🥩", sold: 18.7, unit: "kg", revenue: 224400, margin: 42 },
-  { id: 4, name: "Pollo entero", category: "Pollo", emoji: "🍗", sold: 25.0, unit: "un", revenue: 125000, margin: 28 },
-  { id: 5, name: "Hamburguesas x4", category: "Elaborados", emoji: "🍔", sold: 35.0, unit: "un", revenue: 105000, margin: 55 },
-  { id: 6, name: "Chorizo parrillero", category: "Embutidos", emoji: "🌭", sold: 22.3, unit: "kg", revenue: 89200, margin: 38 },
-  { id: 7, name: "Matambre", category: "Vacuno", emoji: "🥩", sold: 12.8, unit: "kg", revenue: 83200, margin: 40 },
-  { id: 8, name: "Milanesa", category: "Elaborados", emoji: "🍖", sold: 28.5, unit: "kg", revenue: 76950, margin: 48 },
-];
-
-export const MOCK_STOCK_ALERTS = [
-  { product: "Pollo entero", current: 8, min: 15, status: "critical" as const },
-  { product: "Chorizo parrillero", current: 5.2, min: 10, status: "critical" as const },
-  { product: "Vacío", current: 12, min: 15, status: "warning" as const },
-  { product: "Bondiola", current: 7.5, min: 8, status: "warning" as const },
-];
-
-export const MOCK_RECENT_SALES = [
-  { id: "V-0064", time: "19:32", items: 4, total: 18750, payment: "Efectivo", client: "Juan Pérez" },
-  { id: "V-0063", time: "19:15", items: 2, total: 12400, payment: "Transferencia", client: null },
-  { id: "V-0062", time: "18:58", items: 6, total: 34200, payment: "Tarjeta", client: "María García" },
-  { id: "V-0061", time: "18:41", items: 3, total: 9800, payment: "Efectivo", client: null },
-  { id: "V-0060", time: "18:23", items: 5, total: 22600, payment: "Cuenta Corriente", client: "Carlos López" },
-  { id: "V-0059", time: "18:05", items: 1, total: 5400, payment: "Efectivo", client: null },
-];
-
-export const MOCK_ACTIVITY = [
-  { type: "sale" as const, text: '<strong>Venta #V-0064</strong> — Juan Pérez — $18.750', time: "Hace 5 min" },
-  { type: "stock" as const, text: 'Ingreso de stock: <strong>120kg media res</strong> (Prov. Martínez)', time: "Hace 28 min" },
-  { type: "alert" as const, text: '<strong>Stock bajo:</strong> Pollo entero (8 un. restantes)', time: "Hace 45 min" },
-  { type: "sale" as const, text: '<strong>Venta #V-0063</strong> — Consumidor final — $12.400', time: "Hace 1 hora" },
-  { type: "stock" as const, text: 'Desposte completado: <strong>Media res #47</strong> — Rinde 68.5%', time: "Hace 1.5 horas" },
-  { type: "sale" as const, text: '<strong>Venta #V-0062</strong> — María García — $34.200', time: "Hace 2 horas" },
-];
-
-export const MOCK_PAYMENT_BREAKDOWN = [
-  { method: "Efectivo", amount: 425300, percentage: 50.2, color: "#22C55E" },
-  { method: "Transferencia", amount: 228800, percentage: 27.0, color: "#3B82F6" },
-  { method: "Tarjeta", amount: 135400, percentage: 16.0, color: "#F59E0B" },
-  { method: "Cuenta Cte.", amount: 58020, percentage: 6.8, color: "#A855F7" },
-];
-
-export const MOCK_STOCK_LEVELS = [
-  { name: "Vacío", current: 12, max: 25, unit: "kg", percentage: 48 },
-  { name: "Asado de tira", current: 18, max: 30, unit: "kg", percentage: 60 },
-  { name: "Entraña", current: 6.5, max: 15, unit: "kg", percentage: 43 },
-  { name: "Pollo entero", current: 8, max: 30, unit: "un", percentage: 27 },
-  { name: "Chorizo", current: 5.2, max: 15, unit: "kg", percentage: 35 },
-  { name: "Hamburguesas", current: 45, max: 60, unit: "un", percentage: 75 },
-  { name: "Matambre", current: 4.8, max: 10, unit: "kg", percentage: 48 },
-  { name: "Milanesas", current: 15, max: 20, unit: "kg", percentage: 75 },
-];
+export const MOCK_HOURLY_SALES: any[] = [];
+export const MOCK_WEEKLY_SALES: any[] = [];
+export const MOCK_TOP_PRODUCTS: any[] = [];
+export const MOCK_STOCK_ALERTS: any[] = [];
+export const MOCK_RECENT_SALES: any[] = [];
+export const MOCK_ACTIVITY: any[] = [];
+export const MOCK_PAYMENT_BREAKDOWN: any[] = [];
+export const MOCK_STOCK_LEVELS: any[] = [];
 
 export const POS_PRODUCTS = [
   // Vacuno

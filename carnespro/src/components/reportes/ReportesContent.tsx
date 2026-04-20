@@ -17,60 +17,22 @@ import { useCajaStore } from "@/stores/useCajaStore";
 // ── Mock data por período ── (used as fallback or for future periods)
 const MOCK_DATA = {
   hoy: {
-    ventas: 847520,
-    tx: 64,
-    avgTicket: 13242,
-    margen: 34.2,
-    vsTrend: { ventas: 12.5, tx: 8.3, ticket: -2.1, margen: 1.4 },
-    timeline: [
-      { t: "08:00", v: 45200 }, { t: "09:00", v: 78300 }, { t: "10:00", v: 125400 },
-      { t: "11:00", v: 156800 }, { t: "12:00", v: 189200 }, { t: "13:00", v: 142600 },
-      { t: "14:00", v: 98500 }, { t: "15:00", v: 67300 }, { t: "16:00", v: 112400 },
-      { t: "17:00", v: 134700 }, { t: "18:00", v: 167800 }, { t: "19:00", v: 89400 },
-    ],
-    cats: [
-      { name: "Vacuno", emoji: "🥩", v: 382500, color: "#DC2626" },
-      { name: "Elaborados", emoji: "🍔", v: 181950, color: "#F59E0B" },
-      { name: "Pollo", emoji: "🍗", v: 125000, color: "#22C55E" },
-      { name: "Embutidos", emoji: "🌭", v: 89200, color: "#3B82F6" },
-      { name: "Cerdo", emoji: "🐷", v: 68870, color: "#A855F7" },
-    ],
+    ventas: 0, tx: 0, avgTicket: 0, margen: 0,
+    vsTrend: { ventas: 0, tx: 0, ticket: 0, margen: 0 },
+    timeline: [{ t: "08:00", v: 0 }, { t: "12:00", v: 0 }, { t: "16:00", v: 0 }, { t: "20:00", v: 0 }],
+    cats: [] as { name: string; emoji: string; v: number; color: string }[],
   },
   semana: {
-    ventas: 5430000,
-    tx: 468,
-    avgTicket: 11602,
-    margen: 31.8,
-    vsTrend: { ventas: 7.2, tx: 5.1, ticket: 1.9, margen: -0.8 },
-    timeline: [
-      { t: "Lun", v: 680000 }, { t: "Mar", v: 720000 }, { t: "Mié", v: 590000 },
-      { t: "Jue", v: 810000 }, { t: "Vie", v: 950000 }, { t: "Sáb", v: 1250000 }, { t: "Dom", v: 430000 },
-    ],
-    cats: [
-      { name: "Vacuno", emoji: "🥩", v: 2350000, color: "#DC2626" },
-      { name: "Elaborados", emoji: "🍔", v: 1102000, color: "#F59E0B" },
-      { name: "Pollo", emoji: "🍗", v: 812000, color: "#22C55E" },
-      { name: "Embutidos", emoji: "🌭", v: 680000, color: "#3B82F6" },
-      { name: "Cerdo", emoji: "🐷", v: 486000, color: "#A855F7" },
-    ],
+    ventas: 0, tx: 0, avgTicket: 0, margen: 0,
+    vsTrend: { ventas: 0, tx: 0, ticket: 0, margen: 0 },
+    timeline: [{ t: "Lun", v: 0 }, { t: "Mié", v: 0 }, { t: "Vie", v: 0 }, { t: "Dom", v: 0 }],
+    cats: [] as { name: string; emoji: string; v: number; color: string }[],
   },
   mes: {
-    ventas: 23200000,
-    tx: 1847,
-    avgTicket: 12561,
-    margen: 33.1,
-    vsTrend: { ventas: 15.3, tx: 12.7, ticket: 2.3, margen: 0.9 },
-    timeline: [
-      { t: "Sem 1", v: 5200000 }, { t: "Sem 2", v: 6100000 },
-      { t: "Sem 3", v: 5900000 }, { t: "Sem 4", v: 6000000 },
-    ],
-    cats: [
-      { name: "Vacuno", emoji: "🥩", v: 9800000, color: "#DC2626" },
-      { name: "Elaborados", emoji: "🍔", v: 4900000, color: "#F59E0B" },
-      { name: "Pollo", emoji: "🍗", v: 3700000, color: "#22C55E" },
-      { name: "Embutidos", emoji: "🌭", v: 2900000, color: "#3B82F6" },
-      { name: "Cerdo", emoji: "🐷", v: 1900000, color: "#A855F7" },
-    ],
+    ventas: 0, tx: 0, avgTicket: 0, margen: 0,
+    vsTrend: { ventas: 0, tx: 0, ticket: 0, margen: 0 },
+    timeline: [{ t: "Sem 1", v: 0 }, { t: "Sem 2", v: 0 }, { t: "Sem 3", v: 0 }, { t: "Sem 4", v: 0 }],
+    cats: [] as { name: string; emoji: string; v: number; color: string }[],
   },
 } as const;
 
@@ -83,24 +45,17 @@ const PAYMENT_METHODS_CONFIG = [
 ];
 
 const WEEKLY = [
-  { day: "Lun", v: 680000, tx: 58, today: false },
-  { day: "Mar", v: 720000, tx: 62, today: false },
-  { day: "Mié", v: 590000, tx: 51, today: false },
-  { day: "Jue", v: 810000, tx: 70, today: false },
-  { day: "Vie", v: 950000, tx: 82, today: false },
-  { day: "Sáb", v: 1250000, tx: 108, today: false },
-  { day: "Hoy", v: 847520, tx: 64, today: true },
+  { day: "Lun", v: 0, tx: 0, today: false },
+  { day: "Mar", v: 0, tx: 0, today: false },
+  { day: "Mié", v: 0, tx: 0, today: false },
+  { day: "Jue", v: 0, tx: 0, today: false },
+  { day: "Vie", v: 0, tx: 0, today: false },
+  { day: "Sáb", v: 0, tx: 0, today: false },
+  { day: "Hoy", v: 0, tx: 0, today: true },
 ];
-const weekMax = Math.max(...WEEKLY.map(d => d.v));
+const weekMax = Math.max(1, ...WEEKLY.map(d => d.v));
 
-const TOP_PRODUCTS = [
-  { name: "Vacío", cat: "Vacuno", emoji: "🥩", sold: 42.5, unit: "kg", rev: 382500, margin: 35 },
-  { name: "Asado de tira", cat: "Vacuno", emoji: "🥩", sold: 38.2, unit: "kg", rev: 305600, margin: 32 },
-  { name: "Entraña", cat: "Vacuno", emoji: "🥩", sold: 18.7, unit: "kg", rev: 224400, margin: 42 },
-  { name: "Pollo entero", cat: "Pollo", emoji: "🍗", sold: 25.0, unit: "un", rev: 125000, margin: 28 },
-  { name: "Hamburguesas x4", cat: "Elaborados", emoji: "🍔", sold: 35.0, unit: "un", rev: 105000, margin: 55 },
-  { name: "Chorizo", cat: "Embutidos", emoji: "🌭", sold: 22.3, unit: "kg", rev: 89200, margin: 38 },
-];
+const TOP_PRODUCTS: any[] = [];
 
 type Period = "hoy" | "semana" | "mes" | "custom";
 type PaymentEntry = { method: string; amount: number; pct: number; color: string };
