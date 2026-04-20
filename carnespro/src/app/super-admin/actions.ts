@@ -10,3 +10,26 @@ export async function toggleUserBan(userId: string, currentlyBanned: boolean) {
   });
   revalidatePath("/super-admin");
 }
+
+export async function deleteUser(userId: string) {
+  await prisma.user.delete({ where: { id: userId } });
+  revalidatePath("/super-admin");
+}
+
+export async function deleteOrg(orgId: string) {
+  await prisma.organization.delete({ where: { id: orgId } });
+  revalidatePath("/super-admin");
+}
+
+export async function toggleUserRole(userId: string, currentRole: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { role: currentRole === "admin" ? "user" : "admin" },
+  });
+  revalidatePath("/super-admin");
+}
+
+export async function revokeUserSessions(userId: string) {
+  await prisma.session.deleteMany({ where: { userId } });
+  revalidatePath("/super-admin");
+}
