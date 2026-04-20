@@ -362,7 +362,7 @@ export default function DashboardContent() {
     const recentSales = [...currentSession.ventas].reverse().map(v => ({
        id: `TK-${v.id.substring(0,4).toUpperCase()}`,
        time: new Date(v.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-       items: v.items.reduce((s, it) => s + Number(it.quantity || 1), 0),
+       items: v.itemCount || 1,
        total: v.total,
        payment: v.method,
        client: v.clientName || null
