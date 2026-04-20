@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, ShoppingBag, Receipt, Users,
@@ -11,11 +11,8 @@ import {
   AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
-import {
-  MOCK_STATS, MOCK_HOURLY_SALES,
-  MOCK_RECENT_SALES, MOCK_PAYMENT_BREAKDOWN, MOCK_WEEKLY_SALES,
-  formatCurrency, formatNumber,
-} from "@/lib/constants";
+import { formatCurrency, formatNumber } from "@/lib/constants";
+import { useCajaStore } from "@/stores/useCajaStore";
 
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
@@ -60,7 +57,7 @@ function StatCard({ stat, type, delay }: {
     <div className={`stat-card stat-card--${type} animate-in animate-in-delay-${delay}`}>
       <div className="stat-card__top">
         <div className={`stat-card__icon stat-card__icon--${type}`}>{icons[type]}</div>
-        <div className={`stat-card__trend stat-card__trend--${stat.trendDirection}`}>
+        <div className={`stat-card__trend stat-card__trend--${stat.trendDirection}`} style={{ visibility: stat.trend === 0 ? "hidden" : "visible" }}>
           {stat.trendDirection === "up" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
           {Math.abs(stat.trend)}%
         </div>
@@ -94,38 +91,20 @@ function LiveClock() {
   );
 }
 
-function SalesChart() {
-  const [view, setView] = useState<"hourly" | "weekly">("hourly");
-  const data = view === "hourly" ? MOCK_HOURLY_SALES : MOCK_WEEKLY_SALES;
-  const xKey = view === "hourly" ? "hour" : "day";
+function SalesChart({ data }: { data: any[] }) {
+  const displayData = data.length > 0 ? data : [{ hour: "08:00", ventas: 0 }, { hour: "20:00", ventas: 0 }];
 
   return (
     <div className="card animate-in animate-in-delay-2">
       <div className="card__header">
         <div>
-          <div className="card__title">Ventas</div>
-          <div className="card__subtitle">
-            {view === "hourly" ? "Hoy por hora" : "Última semana"}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button
-            className={`btn btn--sm ${view === "hourly" ? "btn--primary" : "btn--ghost"}`}
-            onClick={() => setView("hourly")}
-          >
-            Hoy
-          </button>
-          <button
-            className={`btn btn--sm ${view === "weekly" ? "btn--primary" : "btn--ghost"}`}
-            onClick={() => setView("weekly")}
-          >
-            Semana
-          </button>
+          <div className="card__title">Ventas Hoy</div>
+          <div className="card__subtitle">Evolución por hora</div>
         </div>
       </div>
       <div className="chart-container">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data as any[]} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+          <AreaChart data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#DC2626" stopOpacity={0.3} />
@@ -134,7 +113,7 @@ function SalesChart() {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
             <XAxis
-              dataKey={xKey}
+              dataKey="hour"
               tick={{ fill: "var(--text-muted)", fontSize: 11 }}
               axisLine={{ stroke: "var(--border-light)" }}
               tickLine={false}
@@ -162,13 +141,14 @@ function SalesChart() {
   );
 }
 
-function RightPanel() {
+function RightPanel({ paymentData }: { paymentData: any[] }) {
   const router = useRouter();
-
   const actions = [
     { icon: <ShoppingCart size={18} />, cls: "pos", title: "Nueva Venta", desc: "Abrir punto de venta", href: "/pos" },
-{ icon: <UserPlus size={18} />, cls: "client", title: "Nuevo Cliente", desc: "Registrar cliente", href: "/clientes" },
+    { icon: <UserPlus size={18} />, cls: "client", title: "Nuevo Cliente", desc: "Registrar cliente", href: "/clientes" },
   ];
+
+  const emptyData = [{ method: "Sin registros", amount: 1, color: "var(--border-light)", percentage: 100 }];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -205,15 +185,16 @@ function RightPanel() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={MOCK_PAYMENT_BREAKDOWN}
+                data={paymentData.length > 0 ? paymentData : emptyData}
                 cx="50%"
                 cy="50%"
                 innerRadius={38}
                 outerRadius={56}
-                paddingAngle={3}
+                paddingAngle={paymentData.length > 0 ? 3 : 0}
                 dataKey="amount"
+                stroke="none"
               >
-                {MOCK_PAYMENT_BREAKDOWN.map((entry, idx) => (
+                {(paymentData.length > 0 ? paymentData : emptyData).map((entry, idx) => (
                   <Cell key={idx} fill={entry.color} stroke="transparent" />
                 ))}
               </Pie>
@@ -221,7 +202,12 @@ function RightPanel() {
           </ResponsiveContainer>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-          {MOCK_PAYMENT_BREAKDOWN.map((p) => (
+          {paymentData.length === 0 && (
+            <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem", width: "100%" }}>
+              Aún no hay ventas en la caja actual
+            </div>
+          )}
+          {paymentData.map((p) => (
             <div key={p.method} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.8rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
@@ -241,20 +227,20 @@ function RightPanel() {
   );
 }
 
-
-
-function RecentSalesCard() {
+function RecentSalesCard({ sales }: { sales: any[] }) {
   const router = useRouter();
   return (
     <div className="card animate-in animate-in-delay-2">
       <div className="card__header">
         <div>
           <div className="card__title">Últimas Ventas</div>
-          <div className="card__subtitle">Transacciones recientes</div>
+          <div className="card__subtitle">Transacciones de la caja actual</div>
         </div>
-        <button className="btn btn--ghost btn--sm" onClick={() => router.push("/caja")}>
-          Ver todas <ArrowUpRight size={14} />
-        </button>
+        {sales.length > 0 && (
+          <button className="btn btn--ghost btn--sm" onClick={() => router.push("/caja")}>
+            Ver todas <ArrowUpRight size={14} />
+          </button>
+        )}
       </div>
       <div className="table-wrapper">
         <table className="data-table">
@@ -269,7 +255,17 @@ function RecentSalesCard() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_RECENT_SALES.slice(0, 4).map((sale) => (
+            {sales.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: "center", padding: "32px 0", color: "var(--text-muted)", borderBottom: "none" }}>
+                  No se han registrado transacciones todavía. <br/>
+                  <button className="btn btn--primary btn--sm" style={{ marginTop: 12, margin: "16px auto 0" }} onClick={() => router.push("/pos")}>
+                    Ir al Punto de Venta
+                  </button>
+                </td>
+              </tr>
+            )}
+            {sales.slice(0, 4).map((sale) => (
               <tr key={sale.id}>
                 <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--primary)" }}>
                   {sale.id}
@@ -303,12 +299,78 @@ function RecentSalesCard() {
 
 export default function DashboardContent() {
   const router = useRouter();
+  const { currentSession } = useCajaStore();
+
   const greeting = () => {
     const h = new Date().getHours();
     if (h < 12) return "Buenos días";
     if (h < 18) return "Buenas tardes";
     return "Buenas noches";
   };
+
+  const realData = useMemo(() => {
+    if (!currentSession || currentSession.ventas.length === 0) {
+      return {
+        revenue: 0, orders: 0, ticket: 0, clients: 0,
+        hourlySales: [], recentSales: [], paymentBreakdown: []
+      };
+    }
+
+    const ventas = currentSession.ventas.reduce((acc, v) => acc + v.total, 0);
+    const orders = currentSession.ventas.length;
+    let uniqueClients = new Set(currentSession.ventas.filter(v => v.clientId).map(v => v.clientId)).size;
+    
+    // Si hubo ventas pero no registraron cliente, asumimos al menos 1 publico general
+    if (uniqueClients === 0 && orders > 0) uniqueClients = 1; 
+
+    const ticket = orders > 0 ? Math.round(ventas / orders) : 0;
+    
+    // Evolutivo por hora
+    const mapHourly: Record<string, number> = {};
+    currentSession.ventas.forEach(v => {
+        const h = new Date(v.timestamp).getHours().toString().padStart(2, '0') + ':00';
+        mapHourly[h] = (mapHourly[h] ?? 0) + v.total;
+    });
+    
+    const hourlySales = Object.entries(mapHourly)
+      .map(([hour, val]) => ({ hour, ventas: val }))
+      .sort((a,b) => a.hour.localeCompare(b.hour));
+
+    // Distribucion de medios de pago
+    const paymentMap: Record<string, number> = {};
+    currentSession.ventas.forEach(v => {
+      if (v.splits) {
+        v.splits.forEach(sp => { paymentMap[sp.method] = (paymentMap[sp.method] ?? 0) + sp.amount; });
+      } else {
+        paymentMap[v.method] = (paymentMap[v.method] ?? 0) + v.total;
+      }
+    });
+
+    const colors: any = {
+      "Efectivo": "#22C55E",
+      "Transferencia": "#3B82F6",
+      "Tarjeta": "#F59E0B",
+      "QR / Link": "#A855F7",
+      "Cuenta Corriente": "#EF4444"
+    };
+
+    const paymentBreakdown = Object.entries(paymentMap).map(([m, val]) => ({
+       method: m, amount: val, percentage: ventas > 0 ? parseFloat(((val/ventas)*100).toFixed(1)) : 0, color: colors[m] || "#888"
+    })).sort((a,b) => b.amount - a.amount);
+
+    // ultimas transacciones (top 5)
+    const recentSales = [...currentSession.ventas].reverse().map(v => ({
+       id: `TK-${v.id.substring(0,4).toUpperCase()}`,
+       time: new Date(v.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+       items: v.items.reduce((s, it) => s + Number(it.quantity || 1), 0),
+       total: v.total,
+       payment: v.method,
+       client: v.clientName || null
+    }));
+
+    return { revenue: ventas, orders, ticket, clients: uniqueClients, hourlySales, recentSales, paymentBreakdown };
+  }, [currentSession]);
+
 
   return (
     <div className="page-container">
@@ -328,23 +390,23 @@ export default function DashboardContent() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Conectados a Datos Reales */}
       <div className="stats-grid">
-        <StatCard stat={MOCK_STATS.revenue} type="revenue" delay={1} />
-        <StatCard stat={MOCK_STATS.orders} type="orders" delay={2} />
-        <StatCard stat={MOCK_STATS.avgTicket} type="ticket" delay={3} />
-        <StatCard stat={MOCK_STATS.clients} type="clients" delay={4} />
+        <StatCard stat={{ label: "Ventas del Día", value: realData.revenue, trend: 0, trendDirection: "up" }} type="revenue" delay={1} />
+        <StatCard stat={{ label: "Transacciones", value: realData.orders, trend: 0, trendDirection: "up" }} type="orders" delay={2} />
+        <StatCard stat={{ label: "Ticket Promedio", value: realData.ticket, trend: 0, trendDirection: "up" }} type="ticket" delay={3} />
+        <StatCard stat={{ label: "Clientes Atendidos", value: realData.clients, trend: 0, trendDirection: "up" }} type="clients" delay={4} />
       </div>
 
       {/* Chart + Quick Actions */}
       <div className="dashboard-grid">
-        <SalesChart />
-        <RightPanel />
+        <SalesChart data={realData.hourlySales} />
+        <RightPanel paymentData={realData.paymentBreakdown} />
       </div>
 
       {/* Recent Sales */}
       <div style={{ marginBottom: 24 }}>
-        <RecentSalesCard />
+        <RecentSalesCard sales={realData.recentSales} />
       </div>
 
     </div>
