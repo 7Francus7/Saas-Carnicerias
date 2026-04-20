@@ -1,0 +1,348 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  runtime = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Better Auth tables ────────────────────────────────────────────────────
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  role          String    @default("user")
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+  members       Member[]
+
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime
+  updatedAt            DateTime
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model Organization {
+  id          String       @id
+  name        String
+  slug        String?      @unique
+  logo        String?
+  createdAt   DateTime
+  metadata    String?
+  members     Member[]
+  invitations Invitation[]
+
+  products         Product[]
+  productCosts     ProductCost[]
+  cajaSessions     CajaSession[]
+  cashTransactions CashTransaction[]
+  clients          Client[]
+  staff            Staff[]
+  stockMovements   StockMovement[]
+  settings         BusinessSettings?
+
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       // owner | admin | cashier | viewer
+  createdAt      DateTime
+
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String
+  expiresAt      DateTime
+  inviterId      String
+
+  @@map("invitation")
+}
+
+// ─── Business tables ───────────────────────────────────────────────────────
+
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plu            String
+  name           String
+  category       String
+  emoji          String
+  price          Float
+  unit           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  cost           ProductCost?
+  saleItems      SaleItem[]
+
+  @@unique([organizationId, plu])
+  @@map("product")
+}
+
+model ProductCost {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productId      String       @unique
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cost           Float
+
+  @@map("product_cost")
+}
+
+model CajaSession {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  openedAt       DateTime          @default(now())
+  closedAt       DateTime?
+  startingCash   Float
+  openedById     String
+  closedById     String?
+  realAmounts    Json?
+  tericoByMethod Json?
+  diffByMethod   Json?
+  diffAmount     Float?
+  sales          Sale[]
+  transactions   CashTransaction[]
+
+  @@map("caja_session")
+}
+
+model Sale {
+  id         String             @id @default(cuid())
+  sessionId  String
+  session    CajaSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp  DateTime           @default(now())
+  total      Float
+  method     String
+  itemCount  Int
+  clientId   String?
+  client     Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientName String?
+  splits     SalePaymentSplit[]
+  items      SaleItem[]
+
+  @@map("sale")
+}
+
+model SalePaymentSplit {
+  id     String @id @default(cuid())
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method String
+  amount Float
+
+  @@map("sale_payment_split")
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  price     Float
+  quantity  Float
+  unit      String
+  emoji     String?
+
+  @@map("sale_item")
+}
+
+model CashTransaction {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessionId      String
+  session        CajaSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type           String
+  amount         Float
+  reason         String
+  timestamp      DateTime     @default(now())
+
+  @@map("cash_transaction")
+}
+
+model Client {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  dni            String           @default("")
+  phone          String           @default("")
+  address        String           @default("")
+  email          String           @default("")
+  notes          String           @default("")
+  creditLimit    Float            @default(0)
+  balance        Float            @default(0)
+  status         String           @default("active")
+  lastActivity   DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  movements      ClientMovement[]
+  periods        ClientPeriod[]
+  sales          Sale[]
+
+  @@map("client")
+}
+
+model ClientMovement {
+  id            String        @id @default(cuid())
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  periodId      String?
+  period        ClientPeriod? @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  date          DateTime      @default(now())
+  type          String
+  amount        Float
+  balanceAfter  Float
+  description   String
+  ticketId      String?
+  paymentMethod String?
+
+  @@map("client_movement")
+}
+
+model ClientPeriod {
+  id           String           @id @default(cuid())
+  clientId     String
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  label        String
+  openedAt     DateTime
+  closedAt     DateTime
+  closedReason String
+  totalSales   Float
+  totalPaid    Float
+  finalBalance Float
+  movements    ClientMovement[]
+
+  @@map("client_period")
+}
+
+model Staff {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  dni            String       @default("")
+  phone          String       @default("")
+  role           String
+  address        String       @default("")
+  email          String       @default("")
+  notes          String       @default("")
+  salary         Float        @default(0)
+  schedule       String       @default("")
+  status         String       @default("active")
+  hireDate       DateTime
+  lastActivity   DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@map("staff")
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  date           DateTime     @default(now())
+  type           String
+  productName    String
+  quantity       Float
+  unit           String
+  supplier       String?
+  note           String?
+
+  @@map("stock_movement")
+}
+
+model EmployeePermissions {
+  id             String   @id @default(cuid())
+  memberId       String   @unique
+  organizationId String
+  sections       String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("employee_permissions")
+}
+
+model BusinessSettings {
+  id                       String       @id @default(cuid())
+  organizationId           String       @unique
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  nombre                   String       @default("Carnicería Pro")
+  iniciales                String       @default("CP")
+  direccion                String       @default("")
+  telefono                 String       @default("")
+  cuit                     String       @default("")
+  email                    String       @default("")
+  defaultPaymentMethod     String       @default("cash")
+  stockAlertThreshold      Int          @default(10)
+  requireConfirmOnCheckout Boolean      @default(false)
+
+  @@map("business_settings")
+}
