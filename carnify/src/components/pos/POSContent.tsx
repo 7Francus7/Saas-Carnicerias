@@ -66,7 +66,7 @@ export default function POSContent() {
           creditLimit: c.creditLimit,
           balance: c.balance,
           status: c.status as ClientProfile["status"],
-          lastActivity: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date(c.createdAt).toISOString(),
+          lastActivity: new Date(c.createdAt).toISOString(),
           createdAt: new Date(c.createdAt).toISOString(),
           movements: [],
           periods: [],
