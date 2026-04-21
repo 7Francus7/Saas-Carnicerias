@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Beef, Store } from "lucide-react";
+import { Store } from "lucide-react";
 import { orgClient } from "@/lib/auth-client";
 
 export default function OnboardingPage() {
@@ -47,9 +47,9 @@ export default function OnboardingPage() {
     <div className="auth-card">
       <div className="auth-logo">
         <div className="sidebar__logo-icon">
-          <Beef size={24} color="white" />
+          <Store size={24} color="white" />
         </div>
-        <span className="auth-logo-text">Carnes<span>Pro</span></span>
+        <span className="auth-logo-text">Carnify</span>
       </div>
 
       <div style={{ textAlign: "center", marginBottom: 24 }}>

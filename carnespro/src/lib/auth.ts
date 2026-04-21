@@ -12,6 +12,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     baseURL,
     "https://saas-carnicerias.vercel.app",
+    "https://carnify.vercel.app",
     ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
   ],
   emailAndPassword: {

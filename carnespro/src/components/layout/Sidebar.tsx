@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, ShoppingCart, Beef, Package,
+  LayoutDashboard, ShoppingCart, Store, Package,
   Calculator, Users, Users2, Truck, UserCog, Wallet, BarChart3,
   Settings, LogOut, ChevronRight, Sun, Moon,
 } from "lucide-react";
@@ -16,7 +16,7 @@ import type { SectionKey } from "@/lib/sections";
 import { useImpersonationStore } from "@/stores/useImpersonationStore";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
-  LayoutDashboard, ShoppingCart, Beef, Package,
+  LayoutDashboard, ShoppingCart, Store, Package,
   Calculator, Users, Users2, Truck, UserCog, Wallet, BarChart3,
 };
 
@@ -99,10 +99,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="sidebar__logo">
         <div className="sidebar__logo-icon">
-          <Beef size={20} color="white" />
+          <Store size={20} color="white" />
         </div>
         <div className="sidebar__logo-text">
-          Carnes<span>Pro</span>
+          Carnify
         </div>
       </div>
 

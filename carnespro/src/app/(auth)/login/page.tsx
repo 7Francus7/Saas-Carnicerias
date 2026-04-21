@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Beef, Eye, EyeOff } from "lucide-react";
+import { Store, Eye, EyeOff } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 
 function LoginForm() {
@@ -91,9 +91,9 @@ export default function LoginPage() {
     <div className="auth-card">
       <div className="auth-logo">
         <div className="sidebar__logo-icon">
-          <Beef size={24} color="white" />
+          <Store size={24} color="white" />
         </div>
-        <span className="auth-logo-text">Carnes<span>Pro</span></span>
+        <span className="auth-logo-text">Carnify</span>
       </div>
 
       <h1 className="auth-title">Iniciar sesión</h1>

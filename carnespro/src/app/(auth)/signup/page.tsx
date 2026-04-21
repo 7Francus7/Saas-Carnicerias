@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Beef, Eye, EyeOff } from "lucide-react";
+import { Store, Eye, EyeOff } from "lucide-react";
 import { signUp } from "@/lib/auth-client";
 
 export default function SignupPage() {
@@ -42,9 +42,9 @@ export default function SignupPage() {
     <div className="auth-card">
       <div className="auth-logo">
         <div className="sidebar__logo-icon">
-          <Beef size={24} color="white" />
+          <Store size={24} color="white" />
         </div>
-        <span className="auth-logo-text">Carnes<span>Pro</span></span>
+        <span className="auth-logo-text">Carnify</span>
       </div>
 
       <h1 className="auth-title">Crear cuenta</h1>
