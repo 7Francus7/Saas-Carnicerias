@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 const SEED_SECRET = "carnify-reset-2026";
 const ADMIN_EMAIL = "dellorsif@gmail.com";
 const ADMIN_PASSWORD = "Admin1234!";
-const ADMIN_NAME = "Francesco (Admin)";
+const ADMIN_NAME = "Franco (Admin)";
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
