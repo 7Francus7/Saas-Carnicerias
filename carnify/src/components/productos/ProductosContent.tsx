@@ -17,6 +17,7 @@ export default function ProductosContent() {
   const { products, setProducts, addProduct: storeAdd, updateProduct: storeUpdate, deleteProduct: storeDelete } = useProductsStore();
   const [loading, setLoading] = useState(products.length === 0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     getProducts().then((data) => {
@@ -87,6 +88,7 @@ export default function ProductosContent() {
     const price = parseFloat(form.price);
     if (isNaN(price) || price <= 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
       if (modal === "new") {
         const created = await createProduct({
@@ -111,7 +113,7 @@ export default function ProductosContent() {
       }
       closeModal();
     } catch (err) {
-      alert("Error al guardar el producto");
+      setSaveError("Error al guardar el producto. Intentá de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -461,6 +463,11 @@ export default function ProductosContent() {
                 </div>
               </div>
 
+              {saveError && (
+                <div style={{ color: "var(--danger)", fontSize: "0.85rem", padding: "8px 12px", background: "rgba(239,68,68,0.1)", borderRadius: 8, marginBottom: 8 }}>
+                  {saveError}
+                </div>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn--ghost" onClick={closeModal}>
                   Cancelar

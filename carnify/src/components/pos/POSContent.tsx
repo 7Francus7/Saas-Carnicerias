@@ -12,9 +12,11 @@ import {
 } from "@/lib/constants";
 import { usePOSStore } from "@/stores/usePOSStore";
 import { useProductsStore } from "@/stores/useProductsStore";
-import { useCajaStore } from "@/stores/useCajaStore";
-import { useClientStore } from "@/stores/useClientStore";
+import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
+import type { ClientProfile } from "@/stores/useClientStore";
 import { getProducts } from "@/actions/products";
+import { getCurrentSession, recordSale as dbRecordSale } from "@/actions/caja";
+import { getClients, addSaleToAccount as dbAddSaleToAccount } from "@/actions/clients";
 
 // ── Barcode parsing ─────────────────────────────────────────────────────────
 // Scale EAN-13 format: 2 [PLU 5 digits] [weight in grams 5 digits] [check digit]
@@ -37,13 +39,41 @@ export default function POSContent() {
   const { cart, addToCart, removeFromCart, clearCart, total } = usePOSStore();
   const products = useProductsStore((s) => s.products);
   const setProducts = useProductsStore((s) => s.setProducts);
+  const { currentSession, hydrate } = useCajaStore();
+  const [clients, setClients] = useState<ClientProfile[]>([]);
+
+  const loadSession = useCallback(async () => {
+    const s = await getCurrentSession();
+    if (s) hydrate(mapDbSessionToStore(s), []);
+    else hydrate(null, []);
+  }, [hydrate]);
 
   useEffect(() => {
+    loadSession();
     if (products.length === 0) {
       getProducts().then((data) => setProducts(data as import("@/stores/useProductsStore").Product[]));
     }
-  }, []);
-  const recordSale = useCajaStore((s) => s.recordSale);
+    getClients().then((data) =>
+      setClients(
+        data.map((c) => ({
+          id: c.id,
+          name: c.name,
+          dni: c.dni,
+          phone: c.phone,
+          address: c.address,
+          email: c.email,
+          notes: c.notes ?? "",
+          creditLimit: c.creditLimit,
+          balance: c.balance,
+          status: c.status as ClientProfile["status"],
+          lastActivity: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date(c.createdAt).toISOString(),
+          createdAt: new Date(c.createdAt).toISOString(),
+          movements: [],
+          periods: [],
+        }))
+      )
+    );
+  }, [loadSession]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todos");
   const [showWeightModal, setShowWeightModal] = useState(false);
@@ -57,7 +87,6 @@ export default function POSContent() {
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [weightValue, setWeightValue] = useState("");
   
-  const { clients, addSaleToAccount } = useClientStore();
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   // PLU map rebuilt when products change
@@ -157,22 +186,33 @@ export default function POSContent() {
     }
   };
 
-  const handleCompleteSale = () => {
+  const handleCompleteSale = async () => {
     const fiadoTotal = paymentSplits
       .filter(s => s.method === 'fiado')
       .reduce((acc, s) => acc + s.amount, 0);
 
+    const cartItems = cart.map((item) => ({
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      unit: item.unit,
+      emoji: item.emoji,
+    }));
+
+    await dbRecordSale(total, paymentSplits, cartItems, selectedClientId || undefined, selectedClient?.name);
+
     if (fiadoTotal > 0 && selectedClientId) {
-      addSaleToAccount(selectedClientId, fiadoTotal, `Venta Ticket #${Date.now().toString().slice(-4)} (POS)`);
+      await dbAddSaleToAccount(
+        selectedClientId,
+        fiadoTotal,
+        `Venta Ticket #${Date.now().toString().slice(-4)} (POS)`
+      );
     }
 
-    const saleId = `v-${Date.now()}`;
-    recordSale(total, paymentSplits, cart.length, selectedClientId || undefined, selectedClient?.name);
-    
-    setLastVentaId(saleId);
+    await loadSession();
+    setLastVentaId(`v-${Date.now()}`);
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
-    // Cleanup will happen after success modal closes
   };
 
   const handleFinishSuccess = () => {
@@ -180,6 +220,44 @@ export default function POSContent() {
     setSelectedClientId(null);
     setShowSuccessModal(false);
     setLastVentaId(null);
+  };
+
+  const handlePrintTicket = () => {
+    const date = new Date().toLocaleString("es-AR");
+    const lines = cart.map((item) => {
+      const qty = item.unit === "kg" ? `${item.quantity.toFixed(3)} kg` : `${item.quantity} un`;
+      return `<tr><td>${item.emoji} ${item.name}</td><td>${qty}</td><td style="text-align:right">$${Math.round(item.price * item.quantity).toLocaleString("es-AR")}</td></tr>`;
+    }).join("");
+    const splitLines = paymentSplits.map((s) => {
+      const label = s.method === "cash" ? "Efectivo" : s.method === "transfer" ? "Transferencia" : s.method === "card" ? "Tarjeta" : s.method === "link" ? "QR/Link" : "Cta. Cte.";
+      return `<tr><td colspan="2">${label}</td><td style="text-align:right">$${Math.round(s.amount).toLocaleString("es-AR")}</td></tr>`;
+    }).join("");
+    const win = window.open("", "_blank", "width=400,height=600");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket</title><style>
+      body{font-family:monospace;font-size:13px;margin:16px;color:#000}
+      h2{text-align:center;margin:0 0 4px}
+      p.sub{text-align:center;color:#555;margin:0 0 12px;font-size:11px}
+      table{width:100%;border-collapse:collapse}
+      td{padding:3px 2px}
+      .divider{border-top:1px dashed #000;margin:8px 0}
+      .total{font-size:15px;font-weight:bold}
+      .footer{text-align:center;margin-top:12px;font-size:10px;color:#777}
+    </style></head><body>
+      <h2>Carnify</h2>
+      <p class="sub">${date}</p>
+      <div class="divider"></div>
+      <table>${lines}</table>
+      <div class="divider"></div>
+      <table><tr class="total"><td colspan="2">TOTAL</td><td style="text-align:right">$${Math.round(total).toLocaleString("es-AR")}</td></tr>${splitLines}</table>
+      <div class="divider"></div>
+      <p class="footer">¡Gracias por su compra!</p>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+    handleFinishSuccess();
   };
 
   const updateSplitAmount = (index: number, amount: number) => {
@@ -348,12 +426,18 @@ export default function POSContent() {
                 <span>{formatCurrency(total)}</span>
               </div>
             </div>
+            {!currentSession ? (
+              <div className="pos-no-caja-warning">
+                <AlertCircle size={16} />
+                <span>Abrí la caja antes de vender</span>
+              </div>
+            ) : null}
             <button
               className="pos-checkout-btn"
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || !currentSession}
               onClick={() => setShowCheckoutModal(true)}
             >
-              Cobrar {cart.length > 0 ? formatCurrency(total) : ""}
+              {!currentSession ? "Caja cerrada" : `Cobrar ${cart.length > 0 ? formatCurrency(total) : ""}`}
             </button>
           </div>
         </div>
@@ -639,12 +723,9 @@ export default function POSContent() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button 
+              <button
                 className="btn btn--primary btn--full btn--large"
-                onClick={() => {
-                  console.log("Printing ticket for", lastVentaId);
-                  handleFinishSuccess();
-                }}
+                onClick={handlePrintTicket}
               >
                 Imprimir Ticket
               </button>

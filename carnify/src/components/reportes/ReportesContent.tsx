@@ -12,8 +12,9 @@ import {
   PieChart, Pie, Cell
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
-import { useCajaStore } from "@/stores/useCajaStore";
-import { getSessionHistory } from "@/actions/caja";
+import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
+import { getSessionHistory, getCurrentSession } from "@/actions/caja";
+import { downloadReportePDF } from "@/lib/pdfUtils";
 
 // ── Mock data por período ── (used as fallback or for future periods)
 const MOCK_DATA = {
@@ -125,14 +126,18 @@ function computeFromSessions(sessions: ClosedSession[]) {
 }
 
 export default function ReportesContent() {
-  const { currentSession } = useCajaStore();
+  const { currentSession, hydrate } = useCajaStore();
   const [period, setPeriod] = useState<Period>("hoy");
   const [customDate, setCustomDate] = useState("");
   const [closedSessions, setClosedSessions] = useState<ClosedSession[]>([]);
 
   useEffect(() => {
     getSessionHistory().then(setClosedSessions);
-  }, []);
+    getCurrentSession().then((s) => {
+      if (s) hydrate(mapDbSessionToStore(s), []);
+      else hydrate(null, []);
+    });
+  }, [hydrate]);
 
   // Week = last 7 days
   const weekData = useMemo(() => {
@@ -335,8 +340,18 @@ export default function ReportesContent() {
             />
           </div>
 
-          <button className="btn btn--ghost btn--sm">
-            <Download size={14} /> Exportar
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => downloadReportePDF({
+              period,
+              ventas: d.ventas,
+              tx: d.tx,
+              avgTicket: d.avgTicket,
+              payments: currentPaymentData,
+              weeklyRows,
+            })}
+          >
+            <Download size={14} /> Exportar PDF
           </button>
         </div>
       </div>

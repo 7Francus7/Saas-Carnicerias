@@ -35,6 +35,7 @@ export default function InventoryContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [entryError, setEntryError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"stock" | "history">("stock");
@@ -86,6 +87,7 @@ export default function InventoryContent() {
     const qty = parseFloat(newEntry.quantity);
     if (!newEntry.productName || isNaN(qty) || qty <= 0) return;
     setSaving(true);
+    setEntryError(null);
     try {
       const created = await addStockMovement({
         type: "entry",
@@ -99,7 +101,7 @@ export default function InventoryContent() {
       setShowEntryModal(false);
       setNewEntry({ productName: "", unit: "kg", quantity: "", supplier: "", note: "" });
     } catch {
-      alert("Error al registrar el ingreso");
+      setEntryError("Error al registrar el ingreso. Intentá de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -329,6 +331,11 @@ export default function InventoryContent() {
                 />
               </div>
 
+              {entryError && (
+                <div style={{ color: "var(--danger)", fontSize: "0.85rem", padding: "8px 12px", background: "rgba(239,68,68,0.1)", borderRadius: 8, marginBottom: 8 }}>
+                  {entryError}
+                </div>
+              )}
               <div className="modal-actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setShowEntryModal(false)}>
                   Cancelar

@@ -103,7 +103,7 @@ function mapDbToProfile(c: any): ClientProfile {
 }
 
 export default function ClientsContent() {
-  const { clients, selectedClientId, setSelectedClient, hydrate, addPayment, addSaleToAccount, closePeriod } = useClientStore();
+  const { clients, selectedClientId, setSelectedClient, hydrate } = useClientStore();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -208,11 +208,14 @@ export default function ClientsContent() {
     const prevBalance = selectedClient.balance;
     await dbAddPayment(selectedClient.id, amount, paymentForm.note, paymentForm.method);
     await refreshClients();
-    // find movement from refreshed state for receipt
-    const movement = addPayment(selectedClient.id, amount, paymentForm.note, paymentForm.method);
-    if (movement) {
+    // use freshest movement from store (just hydrated from DB)
+    const freshClient = useClientStore.getState().clients.find(c => c.id === selectedClient.id);
+    const movement = freshClient?.movements[0];
+    if (movement?.type === 'payment') {
       setLastReceipt({ movement, prevBalance });
       setModal('receipt');
+    } else {
+      setModal('none');
     }
     setPaymentForm({ amount: '', note: '', method: 'cash' });
   }
