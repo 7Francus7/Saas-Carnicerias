@@ -139,6 +139,8 @@ model Product {
   saleItems      SaleItem[]
 
   @@unique([organizationId, plu])
+  @@index([organizationId, category])
+  @@index([organizationId, name])
   @@map("product")
 }
 
@@ -186,6 +188,8 @@ model Sale {
   splits     SalePaymentSplit[]
   items      SaleItem[]
 
+  @@index([sessionId, timestamp])
+  @@index([clientId])
   @@map("sale")
 }
 
@@ -247,6 +251,8 @@ model Client {
   periods        ClientPeriod[]
   sales          Sale[]
 
+  @@index([organizationId, status])
+  @@index([organizationId, dni])
   @@map("client")
 }
 
@@ -301,6 +307,8 @@ model Staff {
   lastActivity   DateTime     @default(now())
   createdAt      DateTime     @default(now())
 
+  @@index([organizationId, status])
+  @@index([organizationId, role])
   @@map("staff")
 }
 
