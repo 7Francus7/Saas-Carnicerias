@@ -220,63 +220,77 @@ export default function EmpleadosContent() {
       {/* ── Modal: Create Employee ── */}
       {modal === "create" && (
         <ModalOverlay onClose={closeModal}>
-          <div className="modal__header">
-            <h2 className="modal__title">Nuevo empleado</h2>
-            <button className="modal__close" onClick={closeModal}><X size={18} /></button>
-          </div>
-          <div className="modal__content">
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <FormField label="Nombre completo" icon={<User size={15} />}>
-                <input
-                  className="form-input"
-                  placeholder="Juan García"
-                  value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                />
-              </FormField>
-              <FormField label="Email" icon={<Mail size={15} />}>
-                <input
-                  className="form-input"
-                  type="email"
-                  placeholder="juan@carniceria.com"
-                  value={form.email}
-                  onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                />
-              </FormField>
-              <FormField label="Contraseña" icon={<Lock size={15} />}>
-                <div style={{ position: "relative" }}>
+          <div style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(560px, 95vw)", overflow: "hidden" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-tertiary)" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Nuevo empleado</h2>
+              <button onClick={closeModal} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxHeight: "70vh", overflowY: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Nombre completo</label>
                   <input
                     className="form-input"
-                    type={showPass ? "text" : "password"}
-                    placeholder="Mínimo 8 caracteres"
-                    value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                    style={{ paddingRight: 40 }}
+                    placeholder="Juan García"
+                    value={form.name}
+                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                    style={{ background: "var(--bg-elevated)" }}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass((p) => !p)}
-                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                  >
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Email</label>
+                  <input
+                    className="form-input"
+                    type="email"
+                    placeholder="juan@carniceria.com"
+                    value={form.email}
+                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                    style={{ background: "var(--bg-elevated)" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Contraseña</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      className="form-input"
+                      type={showPass ? "text" : "password"}
+                      placeholder="Mínimo 8 caracteres"
+                      value={form.password}
+                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                      style={{ background: "var(--bg-elevated)", paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((p) => !p)}
+                      style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
+                    >
+                      {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
+                    Secciones habilitadas
+                  </p>
+                  <SectionsGrid selected={form.sections} onToggle={toggleSection} />
+                </div>
+
+                {error && (
+                  <div style={{ background: "var(--danger-soft)", border: "1px solid var(--danger-border)", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <AlertTriangle size={14} />
+                    {error}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", paddingTop: 8 }}>
+                  <button className="btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
+                  <button className="btn--primary" onClick={handleCreate} disabled={saving}>
+                    {saving ? "Creando..." : "Crear empleado"}
                   </button>
                 </div>
-              </FormField>
-
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10 }}>
-                  Secciones habilitadas
-                </p>
-                <SectionsGrid selected={form.sections} onToggle={toggleSection} />
-              </div>
-
-              {error && <ErrorBanner message={error} />}
-
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 8 }}>
-                <button className="btn--ghost btn--sm" onClick={closeModal} disabled={saving}>Cancelar</button>
-                <button className="btn--primary btn--sm" onClick={handleCreate} disabled={saving}>
-                  {saving ? "Creando..." : "Crear empleado"}
-                </button>
               </div>
             </div>
           </div>
