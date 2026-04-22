@@ -14,6 +14,7 @@ import {
 import { formatCurrency, formatNumber } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
 import { getCurrentSession } from "@/actions/caja";
+import { useSession } from "@/lib/auth-client";
 
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
@@ -310,12 +311,16 @@ export default function DashboardContent() {
 
   useEffect(() => { loadSession(); }, [loadSession]);
 
+  const { data: session } = useSession();
+
   const greeting = () => {
     const h = new Date().getHours();
     if (h < 12) return "Buenos días";
     if (h < 18) return "Buenas tardes";
     return "Buenas noches";
   };
+
+  const userName = session?.user?.name?.split(" ")[0] || "Usuario";
 
   const realData = useMemo(() => {
     if (!currentSession || currentSession.ventas.length === 0) {
@@ -386,7 +391,7 @@ export default function DashboardContent() {
       {/* Header */}
       <div className="page-header animate-in">
         <div className="page-header__left">
-          <div className="page-header__greeting">{greeting()}, Administrador 👋</div>
+          <div className="page-header__greeting">{greeting()}, {userName}</div>
           <h1 className="page-header__title">
             Panel de <span>Control</span>
           </h1>
