@@ -1109,13 +1109,214 @@ a:hover { color: var(--primary-light); }
 .caja-status__text--open { color: var(--success); }
 .caja-status__text--closed { color: var(--danger); }
 
-/* ── Responsive ── */
-@media (max-width: 1400px) {
+/* ── Responsive: PC Screens ── */
+
+/* Small Laptop (1280px - 1366px) */
+@media (min-width: 1280px) and (max-width: 1366px) {
   :root {
-    --sidebar-width: 240px;
+    --sidebar-width: 220px;
+    --header-height: 56px;
+  }
+  .page-container {
+    max-width: 1100px;
+    padding: 20px 24px;
   }
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    padding: 16px;
+    gap: 10px;
+  }
+  .stat-card__value {
+    font-size: 1.5rem;
+  }
+  .stat-card__label {
+    font-size: 0.75rem;
+  }
+  .stat-card__icon {
+    width: 36px;
+    height: 36px;
+  }
+  .dashboard-grid {
+    gap: 16px;
+  }
+  .bottom-grid {
+    gap: 16px;
+  }
+  .page-header {
+    margin-bottom: 20px;
+  }
+  .page-header__title {
+    font-size: 1.5rem;
+  }
+}
+
+/* Standard Laptop (1440px) */
+@media (min-width: 1367px) and (max-width: 1536px) {
+  :root {
+    --sidebar-width: 250px;
+  }
+  .page-container {
+    max-width: 1200px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .stat-card {
+    padding: 20px;
+  }
+  .stat-card__value {
+    font-size: 1.75rem;
+  }
+}
+
+/* Full HD Desktop (1920px) */
+@media (min-width: 1537px) and (max-width: 1920px) {
+  :root {
+    --sidebar-width: 260px;
+  }
+  .page-container {
+    max-width: 1600px;
+    padding: 28px 32px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  .stat-card {
+    padding: 24px;
+  }
+  .stat-card__value {
+    font-size: 2rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+  }
+  .bottom-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+/* Large Desktop (1920px+) */
+@media (min-width: 1921px) and (max-width: 2559px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+  .page-container {
+    max-width: 1800px;
+    padding: 32px 40px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+  }
+  .stat-card {
+    padding: 28px;
+  }
+  .stat-card__value {
+    font-size: 2.25rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr 420px;
+    gap: 24px;
+  }
+  .bottom-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .data-table th,
+  .data-table td {
+    padding: 14px 18px;
+    font-size: 0.9rem;
+  }
+}
+
+/* 2K / QHD Desktop (2560px) */
+@media (min-width: 2560px) and (max-width: 3439px) {
+  :root {
+    --sidebar-width: 320px;
+  }
+  .page-container {
+    max-width: 2200px;
+    padding: 40px 48px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+  }
+  .stat-card {
+    padding: 28px;
+  }
+  .stat-card__value {
+    font-size: 2.5rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr 480px;
+    gap: 28px;
+  }
+  .bottom-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+  }
+  h1 { font-size: 2.25rem; }
+  h2 { font-size: 1.75rem; }
+  h3 { font-size: 1.35rem; }
+}
+
+/* Ultra Wide / 4K (3440px+) */
+@media (min-width: 3440px) {
+  :root {
+    --sidebar-width: 360px;
+  }
+  .page-container {
+    max-width: 3000px;
+    padding: 48px 64px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+  }
+  .stat-card {
+    padding: 32px;
+  }
+  .stat-card__value {
+    font-size: 2.75rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr 560px;
+    gap: 32px;
+  }
+  .bottom-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+  }
+  h1 { font-size: 2.5rem; }
+  h2 { font-size: 2rem; }
+  h3 { font-size: 1.5rem; }
+}
+
+/* Fallback for smaller */
+@media (max-width: 1279px) {
+  :root {
+    --sidebar-width: 72px;
+  }
+  .sidebar__logo-text,
+  .sidebar__link-text,
+  .sidebar__section-title,
+  .sidebar__user-info,
+  .sidebar__badge,
+  .sidebar__chevron {
+    display: none;
+  }
+  .sidebar__link {
+    justify-content: center;
+    padding: 12px;
   }
 }
 
@@ -2438,6 +2639,45 @@ a:hover { color: var(--primary-light); }
 }
 
 /* ── POS Specific Styles ── */
+
+/* Large POS screens - PC */
+@media (min-width: 1920px) {
+  .pos-layout {
+    grid-template-columns: 1fr 500px;
+  }
+  .pos-card {
+    min-height: 160px;
+    padding: 24px 20px;
+  }
+  .pos-card__emoji {
+    font-size: 2.5rem;
+  }
+  .pos-card__name {
+    font-size: 1.1rem;
+  }
+  .pos-card__price {
+    font-size: 1.15rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .pos-layout {
+    grid-template-columns: 1fr 600px;
+  }
+  .pos-card {
+    min-height: 180px;
+    padding: 28px 24px;
+  }
+  .pos-card__emoji {
+    font-size: 3rem;
+  }
+  .pos-card__name {
+    font-size: 1.25rem;
+  }
+  .pos-card__price {
+    font-size: 1.35rem;
+  }
+}
 
 .pos-layout {
   display: grid;
