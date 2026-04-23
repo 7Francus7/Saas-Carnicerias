@@ -32,7 +32,20 @@ const ROLE_COLORS: Record<string, string> = {
   viewer:  "#71717A",
 };
 
-const EMPTY_FORM = { name: "", email: "", password: "", sections: [] as SectionKey[] };
+const EMPTY_FORM = { 
+  name: "", 
+  email: "", 
+  password: "", 
+  dni: "", 
+  phone: "", 
+  address: "", 
+  position: "", 
+  salary: "", 
+  schedule: "", 
+  status: "Activo", 
+  notes: "", 
+  sections: [] as SectionKey[] 
+};
 
 export default function EmpleadosContent() {
   const router = useRouter();
@@ -290,6 +303,53 @@ export default function EmpleadosContent() {
                   <button className="btn--primary" onClick={handleCreate} disabled={saving}>
                     {saving ? "Creando..." : "Crear empleado"}
                   </button>
+                </div>
+              </div>
+              {/* Nueva UI: campos extendidos (solo visual) */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 12,
+              }}>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>DNI</label>
+                  <input className="form-input" placeholder="20-12345678-9" value={form.dni} onChange={(e)=>setForm((p)=>({...p, dni: e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Teléfono</label>
+                  <input className="form-input" placeholder="11-4567-8901" value={form.phone} onChange={(e)=>setForm((p)=>({...p, phone: e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Dirección</label>
+                  <input className="form-input" placeholder="Av. Corrientes 1234, CABA" value={form.address} onChange={(e)=>setForm((p)=>({...p, address: e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Cargo</label>
+                  <select className="form-input" value={form.position} onChange={(e)=>setForm((p)=>({...p, position: e.target.value}))}>
+                    <option value="">Selecciona cargo</option>
+                    <option value="carnicero">Carnicero</option>
+                    <option value="administrador">Administrador</option>
+                    <option value="atencion">Atención</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Sueldo</label>
+                  <input className="form-input" placeholder="0" value={form.salary} onChange={(e)=>setForm((p)=>({...p, salary: e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Horario</label>
+                  <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00" value={form.schedule} onChange={(e)=>setForm((p)=>({...p, schedule: e.target.value}))}/>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Estado</label>
+                  <select className="form-input" value={form.status} onChange={(e)=>setForm((p)=>({...p, status: e.target.value}))}>
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                  </select>
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Notas</label>
+                  <textarea className="form-input" rows={3} placeholder="Observaciones..." value={form.notes} onChange={(e)=>setForm((p)=>({...p, notes: e.target.value}))}/>
                 </div>
               </div>
             </div>
