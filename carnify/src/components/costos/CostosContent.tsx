@@ -199,7 +199,7 @@ export default function CostosContent() {
       {/* Filters */}
       <div className="costos-filters animate-in animate-in-delay-1">
         <div className="prod-search">
-          <Search size={17} className="prod-search__icon" />
+          <span className="prod-search__icon"><Search size={17} /></span>
           <input
             type="text"
             placeholder="Buscar producto..."
@@ -400,6 +400,7 @@ export default function CostosContent() {
           position: absolute; left: 14px; top: 50%;
           transform: translateY(-50%);
           color: var(--text-muted); pointer-events: none;
+          display: flex; align-items: center;
         }
         .prod-search__input {
           width: 100%;

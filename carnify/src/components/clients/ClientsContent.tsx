@@ -514,14 +514,14 @@ export default function ClientsContent() {
                   </div>
                 </div>
               </div>
-              <div className="summary-card">
+              <div className="summary-card summary-card--credit">
                 <div className="summary-card__icon"><CreditCard size={20} /></div>
                 <div>
                   <div className="summary-card__label">Límite Crédito</div>
                   <div className="summary-card__value">{formatCurrency(selectedClient.creditLimit)}</div>
                 </div>
               </div>
-              <div className="summary-card">
+              <div className="summary-card summary-card--available">
                 <div className="summary-card__icon"><CheckCircle2 size={20} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="summary-card__label">Crédito Disponible</div>
@@ -539,7 +539,7 @@ export default function ClientsContent() {
                   </div>
                 </div>
               </div>
-              <div className="summary-card">
+              <div className="summary-card summary-card--purchases">
                 <div className="summary-card__icon"><TrendingUp size={20} /></div>
                 <div>
                   <div className="summary-card__label">Total Comprado</div>
@@ -1498,8 +1498,14 @@ export default function ClientsContent() {
           color: var(--text-tertiary);
           font-size: 0.82rem;
           background: var(--bg-secondary);
-          padding: 3px 9px;
+          padding: 4px 10px;
           border-radius: var(--radius-full);
+          border: 1px solid var(--border-light);
+          transition: all var(--transition-fast);
+        }
+        .profile-meta span:hover {
+          color: var(--text-secondary);
+          border-color: var(--border);
         }
 
         .header-actions {
@@ -1554,9 +1560,48 @@ export default function ClientsContent() {
 
         .summary-card--main {
           background: linear-gradient(135deg, var(--bg-card) 0%, rgba(220, 38, 38, 0.08) 100%);
-          border-color: var(--primary);
+          border-color: rgba(220, 38, 38, 0.4);
           border-top: 3px solid var(--primary);
           box-shadow: 0 4px 20px rgba(220, 38, 38, 0.15);
+        }
+        .summary-card--main .summary-card__icon {
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+          color: white;
+          border-color: transparent;
+          box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+        }
+
+        .summary-card--credit {
+          border-top: 3px solid #60A5FA;
+          background: linear-gradient(135deg, var(--bg-card) 0%, rgba(96, 165, 250, 0.05) 100%);
+          border-color: rgba(96, 165, 250, 0.25);
+        }
+        .summary-card--credit .summary-card__icon {
+          color: #60A5FA;
+          background: linear-gradient(135deg, rgba(96, 165, 250, 0.18) 0%, rgba(96, 165, 250, 0.08) 100%);
+          border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .summary-card--available {
+          border-top: 3px solid var(--success);
+          background: linear-gradient(135deg, var(--bg-card) 0%, rgba(74, 222, 128, 0.05) 100%);
+          border-color: rgba(74, 222, 128, 0.25);
+        }
+        .summary-card--available .summary-card__icon {
+          color: var(--success);
+          background: linear-gradient(135deg, rgba(74, 222, 128, 0.18) 0%, rgba(74, 222, 128, 0.08) 100%);
+          border-color: rgba(74, 222, 128, 0.3);
+        }
+
+        .summary-card--purchases {
+          border-top: 3px solid var(--secondary);
+          background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255, 167, 38, 0.05) 100%);
+          border-color: rgba(255, 167, 38, 0.25);
+        }
+        .summary-card--purchases .summary-card__icon {
+          color: var(--secondary);
+          background: linear-gradient(135deg, rgba(255, 167, 38, 0.18) 0%, rgba(255, 167, 38, 0.08) 100%);
+          border-color: rgba(255, 167, 38, 0.3);
         }
 
         .summary-card__icon {
@@ -1684,6 +1729,11 @@ export default function ClientsContent() {
           display: flex;
           align-items: center;
           gap: 10px;
+          color: var(--text-primary);
+        }
+        .ledger-header h3 svg {
+          color: var(--primary);
+          flex-shrink: 0;
         }
 
         .ledger-empty {
@@ -2604,23 +2654,29 @@ export default function ClientsContent() {
         }
         .mvt-filter:hover { color: var(--text-secondary); }
         .mvt-filter--active {
-          background: var(--bg-card);
-          color: var(--text-primary);
+          background: var(--primary-soft);
+          color: var(--primary);
+          font-weight: 700;
         }
 
         /* Ledger totals */
         .ledger-totals {
           display: flex;
           gap: 24px;
-          padding: 14px 16px;
+          padding: 14px 20px;
           background: var(--bg-secondary);
-          border-radius: var(--radius-md);
-          margin-top: 12px;
+          border-radius: var(--radius-lg);
+          margin-top: 16px;
           font-size: 0.82rem;
           color: var(--text-tertiary);
           flex-wrap: wrap;
+          border: 1px solid var(--border-light);
+          align-items: center;
         }
-        .ledger-totals strong { font-family: var(--font-mono); }
+        .ledger-totals strong {
+          font-family: var(--font-mono);
+          font-size: 0.9rem;
+        }
 
         /* Quick amounts */
         .quick-amounts {
