@@ -75,6 +75,14 @@ export async function getOrgMembers() {
     role: m.role,
     name: m.user.name,
     email: m.user.email,
+    dni: m.dni ?? null,
+    phone: m.phone ?? null,
+    address: m.address ?? null,
+    position: m.position ?? null,
+    salary: m.salary ?? null,
+    schedule: m.schedule ?? null,
+    status: m.status ?? null,
+    notes: m.notes ?? null,
     sections:
       m.role === "owner" || m.role === "admin"
         ? ("all" as const)
@@ -117,6 +125,7 @@ export async function createEmployee(data: {
       userId: result.user.id,
       organizationId: tenantId,
       role: "cashier",
+      createdAt: new Date(),
       dni: data.dni ?? null,
       phone: data.phone ?? null,
       address: data.address ?? null,
