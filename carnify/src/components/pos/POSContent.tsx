@@ -353,7 +353,9 @@ export default function POSContent() {
               className="pos-card"
               onClick={() => handleProductClick(product)}
             >
-              <div className="pos-card__emoji">{product.emoji}</div>
+              <div className="pos-card__emoji-wrap">
+                <div className="pos-card__emoji">{product.emoji}</div>
+              </div>
               <div className="pos-card__name">{product.name}</div>
               <div className="pos-card__price">
                 {formatCurrency(product.price)} / {product.unit}
@@ -446,54 +448,58 @@ export default function POSContent() {
       {/* ── Modal: Peso manual ── */}
       {showWeightModal && activeProduct && (
         <div className="modal-overlay" onClick={() => setShowWeightModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal--weight" onClick={(e) => e.stopPropagation()}>
             <div className="modal__header">
-              <h3 className="modal__title">Ingresár Peso Manual</h3>
+              <div className="weight-product-info">
+                <span className="weight-product-info__emoji">{activeProduct.emoji}</span>
+                <div>
+                  <h3 className="modal__title">{activeProduct.name}</h3>
+                  <span className="weight-product-info__subtext">{formatCurrency(activeProduct.price)} / kg</span>
+                </div>
+              </div>
               <button className="modal__close" onClick={() => setShowWeightModal(false)}>
                 <X size={18} />
               </button>
             </div>
             <div className="modal__content">
-              <div className="weight-display">
-                <div className="weight-display__product">
-                  <span className="weight-display__emoji">{activeProduct.emoji}</span>
-                  <span className="weight-display__name">{activeProduct.name}</span>
+              <div className="weight-modal-body">
+                <div className="weight-screen">
+                  <div className="weight-screen__display">
+                    <input
+                      type="text"
+                      className="weight-screen__input"
+                      placeholder="0.000"
+                      autoFocus
+                      value={weightValue}
+                      onChange={(e) => setWeightValue(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && confirmWeight()}
+                    />
+                    <span className="weight-screen__unit">kg</span>
+                  </div>
+                  <div className="weight-screen__total">
+                    {formatCurrency((parseFloat(weightValue.replace(",", ".")) || 0) * activeProduct.price)}
+                  </div>
                 </div>
-                <div className="weight-input-container">
-                  <input
-                    type="text"
-                    className="weight-input"
-                    placeholder="0.000"
-                    autoFocus
-                    value={weightValue}
-                    onChange={(e) => setWeightValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && confirmWeight()}
-                  />
-                  <span className="weight-unit">kg</span>
-                </div>
-                <div className="weight-result">
-                  Total: {formatCurrency((parseFloat(weightValue.replace(",", ".")) || 0) * activeProduct.price)}
-                </div>
-              </div>
 
-              <div className="numpad">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, ".", 0, "C"].map((val) => (
-                  <button
-                    key={val}
-                    className={`numpad__btn ${val === "C" ? "numpad__btn--clear" : ""}`}
-                    onClick={() => {
-                      if (val === "C") setWeightValue("");
-                      else setWeightValue((prev) => prev + val);
-                    }}
-                  >
-                    {val}
-                  </button>
-                ))}
-              </div>
+                <div className="numpad">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, ".", 0, "⌫"].map((val) => (
+                    <button
+                      key={val}
+                      className={`numpad__btn ${val === "⌫" ? "numpad__btn--backspace" : ""}`}
+                      onClick={() => {
+                        if (val === "⌫") setWeightValue((prev) => prev.slice(0, -1));
+                        else setWeightValue((prev) => prev + val);
+                      }}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
 
-              <button className="btn btn--primary btn--full" onClick={confirmWeight}>
-                Agregar al carrito
-              </button>
+                <button className="weight-confirm-btn" onClick={confirmWeight}>
+                  Agregar al carrito
+                </button>
+              </div>
             </div>
           </div>
         </div>

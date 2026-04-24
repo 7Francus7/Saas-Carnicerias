@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users2, UserPlus, Shield, Trash2, Edit3, X,
-  Eye, EyeOff, Check, Mail, Lock, User, AlertTriangle, MonitorPlay,
+  Eye, EyeOff, Check, AlertTriangle, MonitorPlay,
 } from "lucide-react";
 import {
   getOrgMembers,
@@ -32,19 +32,19 @@ const ROLE_COLORS: Record<string, string> = {
   viewer:  "#71717A",
 };
 
-const EMPTY_FORM = { 
-  name: "", 
-  email: "", 
-  password: "", 
-  dni: "", 
-  phone: "", 
-  address: "", 
-  position: "", 
-  salary: "", 
-  schedule: "", 
-  status: "Activo", 
-  notes: "", 
-  sections: [] as SectionKey[] 
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  password: "",
+  dni: "",
+  phone: "",
+  address: "",
+  position: "",
+  salary: "",
+  schedule: "",
+  status: "Activo",
+  notes: "",
+  sections: [] as SectionKey[]
 };
 
 export default function EmpleadosContent() {
@@ -241,125 +241,124 @@ export default function EmpleadosContent() {
       {/* ── Modal: Create Employee ── */}
       {modal === "create" && (
         <ModalOverlay onClose={closeModal}>
-          <div style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(560px, 95vw)", overflow: "hidden" }}>
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-tertiary)" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Nuevo empleado</h2>
-              <button onClick={closeModal} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
-                <X size={18} />
+          <div style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(580px, 95vw)", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-tertiary)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--primary-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <UserPlus size={16} color="var(--primary)" />
+                </div>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Nuevo Empleado</h2>
+              </div>
+              <button onClick={closeModal} style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
+                <X size={16} />
               </button>
             </div>
-            <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20, maxHeight: "70vh", overflowY: "auto" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Nombre completo</label>
-                  <input
-                    className="form-input"
-                    placeholder="Juan García"
-                    value={form.name}
-                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                    style={{ background: "var(--bg-elevated)" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Email</label>
-                  <input
-                    className="form-input"
-                    type="email"
-                    placeholder="juan@carniceria.com"
-                    value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    style={{ background: "var(--bg-elevated)" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, display: "block" }}>Contraseña</label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      className="form-input"
-                      type={showPass ? "text" : "password"}
-                      placeholder="Mínimo 8 caracteres"
-                      value={form.password}
-                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                      style={{ background: "var(--bg-elevated)", paddingRight: 40 }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass((p) => !p)}
-                      style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                    >
-                      {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
+
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20, maxHeight: "72vh", overflowY: "auto" }}>
+
+              {/* Sección: Acceso */}
+              <div>
+                <SectionDivider label="Acceso al sistema" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ gridColumn: "span 2" }}>
+                    <FieldLabel required>Nombre completo</FieldLabel>
+                    <input className="form-input" placeholder="Ej: Juan Pérez" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <FieldLabel required>Email</FieldLabel>
+                    <input className="form-input" type="email" placeholder="email@ejemplo.com" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+                  </div>
+                  <div>
+                    <FieldLabel required>Contraseña</FieldLabel>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        className="form-input"
+                        type={showPass ? "text" : "password"}
+                        placeholder="Mínimo 8 caracteres"
+                        value={form.password}
+                        onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                        style={{ paddingRight: 40 }}
+                      />
+                      <button type="button" onClick={() => setShowPass((p) => !p)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
+                        {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 12 }}>
-                    Secciones habilitadas
-                  </p>
-                  <SectionsGrid selected={form.sections} onToggle={toggleSection} />
-                </div>
-
-                {error && (
-                  <div style={{ background: "var(--danger-soft)", border: "1px solid var(--danger-border)", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: "var(--danger)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <AlertTriangle size={14} />
-                    {error}
+              {/* Sección: Datos personales */}
+              <div>
+                <SectionDivider label="Datos personales" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <FieldLabel>DNI</FieldLabel>
+                    <input className="form-input" placeholder="20-12345678-9" value={form.dni} onChange={(e) => setForm((p) => ({ ...p, dni: e.target.value }))} />
                   </div>
-                )}
+                  <div>
+                    <FieldLabel>Teléfono</FieldLabel>
+                    <input className="form-input" placeholder="11-4567-8901" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+                  </div>
+                  <div style={{ gridColumn: "span 2" }}>
+                    <FieldLabel>Dirección</FieldLabel>
+                    <input className="form-input" placeholder="Av. Corrientes 1234, CABA" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
 
-                <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", paddingTop: 8 }}>
-                  <button className="btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
-                  <button className="btn--primary" onClick={handleCreate} disabled={saving}>
-                    {saving ? "Creando..." : "Crear empleado"}
-                  </button>
+              {/* Sección: Información laboral */}
+              <div>
+                <SectionDivider label="Información laboral" />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <FieldLabel>Cargo</FieldLabel>
+                    <select className="form-input" value={form.position} onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}>
+                      <option value="">Seleccionar cargo</option>
+                      <option value="carnicero">Carnicero</option>
+                      <option value="administrador">Administrador</option>
+                      <option value="atencion">Atención al cliente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Sueldo ($)</FieldLabel>
+                    <input className="form-input" type="number" placeholder="0" min="0" value={form.salary} onChange={(e) => setForm((p) => ({ ...p, salary: e.target.value }))} />
+                  </div>
+                  <div>
+                    <FieldLabel>Horario</FieldLabel>
+                    <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00" value={form.schedule} onChange={(e) => setForm((p) => ({ ...p, schedule: e.target.value }))} />
+                  </div>
+                  <div>
+                    <FieldLabel>Estado</FieldLabel>
+                    <select className="form-input" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                      <option value="Activo">Activo</option>
+                      <option value="Inactivo">Inactivo</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              {/* Nueva UI: campos extendidos (solo visual) */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
-                gap: 12,
-              }}>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>DNI</label>
-                  <input className="form-input" placeholder="20-12345678-9" value={form.dni} onChange={(e)=>setForm((p)=>({...p, dni: e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Teléfono</label>
-                  <input className="form-input" placeholder="11-4567-8901" value={form.phone} onChange={(e)=>setForm((p)=>({...p, phone: e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Dirección</label>
-                  <input className="form-input" placeholder="Av. Corrientes 1234, CABA" value={form.address} onChange={(e)=>setForm((p)=>({...p, address: e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Cargo</label>
-                  <select className="form-input" value={form.position} onChange={(e)=>setForm((p)=>({...p, position: e.target.value}))}>
-                    <option value="">Selecciona cargo</option>
-                    <option value="carnicero">Carnicero</option>
-                    <option value="administrador">Administrador</option>
-                    <option value="atencion">Atención</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Sueldo</label>
-                  <input className="form-input" placeholder="0" value={form.salary} onChange={(e)=>setForm((p)=>({...p, salary: e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Horario</label>
-                  <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00" value={form.schedule} onChange={(e)=>setForm((p)=>({...p, schedule: e.target.value}))}/>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Estado</label>
-                  <select className="form-input" value={form.status} onChange={(e)=>setForm((p)=>({...p, status: e.target.value}))}>
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                  </select>
-                </div>
-                <div style={{ gridColumn: "span 2" }}>
-                  <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Notas</label>
-                  <textarea className="form-input" rows={3} placeholder="Observaciones..." value={form.notes} onChange={(e)=>setForm((p)=>({...p, notes: e.target.value}))}/>
-                </div>
+
+              {/* Sección: Permisos */}
+              <div>
+                <SectionDivider label="Secciones habilitadas" />
+                <SectionsGrid selected={form.sections} onToggle={toggleSection} />
               </div>
+
+              {/* Notas */}
+              <div>
+                <FieldLabel>Notas</FieldLabel>
+                <textarea className="form-input" rows={3} placeholder="Observaciones..." value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} style={{ resize: "vertical" }} />
+              </div>
+
+              {error && <ErrorBanner message={error} />}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, justifyContent: "flex-end", background: "var(--bg-tertiary)" }}>
+              <button className="btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
+              <button className="btn--primary" onClick={handleCreate} disabled={saving}>
+                {saving ? "Creando..." : "Crear empleado"}
+              </button>
             </div>
           </div>
         </ModalOverlay>
@@ -605,23 +604,20 @@ function SectionsGrid({
   );
 }
 
-function FormField({
-  label,
-  icon,
-  children,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function SectionDivider({ label }: { label: string }) {
   return (
-    <div className="form-group">
-      <label className="form-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {icon}
-        {label}
-      </label>
-      {children}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-muted)", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
     </div>
+  );
+}
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 6, display: "block" }}>
+      {children}{required && <span style={{ color: "var(--primary)", marginLeft: 2 }}>*</span>}
+    </label>
   );
 }
 
