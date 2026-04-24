@@ -1,0 +1,9 @@
+-- Migration: add extended fields to Member
+ALTER TABLE "member" ADD COLUMN "dni" VARCHAR(255);
+ALTER TABLE "member" ADD COLUMN "phone" VARCHAR(50);
+ALTER TABLE "member" ADD COLUMN "address" TEXT;
+ALTER TABLE "member" ADD COLUMN "position" VARCHAR(100);
+ALTER TABLE "member" ADD COLUMN "salary" FLOAT;
+ALTER TABLE "member" ADD COLUMN "schedule" VARCHAR(255);
+ALTER TABLE "member" ADD COLUMN "status" VARCHAR(50);
+ALTER TABLE "member" ADD COLUMN "notes" TEXT;

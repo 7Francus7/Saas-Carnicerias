@@ -118,6 +118,14 @@ export default function EmpleadosContent() {
         email: form.email.trim(),
         password: form.password,
         sections: form.sections,
+        dni: form.dni,
+        phone: form.phone,
+        address: form.address,
+        position: form.position,
+        salary: form.salary ? parseFloat(form.salary) : undefined,
+        schedule: form.schedule,
+        status: form.status,
+        notes: form.notes,
       });
       await load();
       closeModal();

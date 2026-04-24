@@ -103,6 +103,14 @@ model Member {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role           String       // owner | admin | cashier | viewer
+  dni            String?
+  phone          String?
+  address        String?
+  position       String?
+  salary         Float?
+  schedule       String?
+  status         String?
+  notes          String?
   createdAt      DateTime
 
   @@map("member")

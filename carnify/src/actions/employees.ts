@@ -90,6 +90,14 @@ export async function createEmployee(data: {
   email: string;
   password: string;
   sections: SectionKey[];
+  dni?: string;
+  phone?: string;
+  address?: string;
+  position?: string;
+  salary?: number;
+  schedule?: string;
+  status?: string;
+  notes?: string;
 }) {
   const { tenantId } = await requireOwnerOrAdmin();
 
@@ -109,7 +117,14 @@ export async function createEmployee(data: {
       userId: result.user.id,
       organizationId: tenantId,
       role: "cashier",
-      createdAt: new Date(),
+      dni: data.dni ?? null,
+      phone: data.phone ?? null,
+      address: data.address ?? null,
+      position: data.position ?? null,
+      salary: data.salary ?? null,
+      schedule: data.schedule ?? null,
+      status: data.status ?? null,
+      notes: data.notes ?? null,
     },
   });
 
