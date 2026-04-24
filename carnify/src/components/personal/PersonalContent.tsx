@@ -367,47 +367,60 @@ export default function PersonalContent() {
 
       {modal === 'addStaff' && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal--wide" onClick={e => e.stopPropagation()}>
-            <div className="modal__header">
-              <h3>Nuevo Empleado</h3>
+          <div className="modal emp-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal__header emp-modal__heading">
+              <div className="emp-modal__icon"><UserPlus size={20} /></div>
+              <div>
+                <h3 style={{margin: 0}}>Nuevo Empleado</h3>
+                <span className="emp-modal__subtitle">Complete los datos del nuevo empleado</span>
+              </div>
               <button className="modal__close" onClick={closeModal}><X size={18} /></button>
             </div>
-            <form onSubmit={handleSaveStaff} className="modal__body">
-              <div className="form-grid-2">
+            <form onSubmit={handleSaveStaff} className="emp-modal__body">
+              <div className="section-divider">
+                <span className="section-divider__label">Datos Personales</span>
+                <div className="section-divider__line"></div>
+              </div>
+              <div className="emp-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Nombre completo *</label>
+                  <label className="field-label">Nombre completo<span className="field-label__req">*</span></label>
                   <input className="form-input" required placeholder="Ej: Juan Pérez"
                     value={staffForm.name}
                     onChange={e => setStaffForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">DNI *</label>
+                  <label className="field-label">DNI<span className="field-label__req">*</span></label>
                   <input className="form-input" required placeholder="20-12345678-9"
                     value={staffForm.dni}
                     onChange={e => setStaffForm(f => ({ ...f, dni: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Teléfono</label>
+                  <label className="field-label">Teléfono</label>
                   <input className="form-input" placeholder="11-4567-8901"
                     value={staffForm.phone}
                     onChange={e => setStaffForm(f => ({ ...f, phone: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className="field-label">Email</label>
                   <input className="form-input" type="email" placeholder="email@ejemplo.com"
                     value={staffForm.email}
                     onChange={e => setStaffForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Dirección</label>
+              <div className="form-group emp-form-col-2">
+                <label className="field-label">Dirección</label>
                 <input className="form-input" placeholder="Av. Corrientes 1234, CABA"
                   value={staffForm.address}
                   onChange={e => setStaffForm(f => ({ ...f, address: e.target.value }))} />
               </div>
-              <div className="form-grid-2">
+              
+              <div className="section-divider">
+                <span className="section-divider__label">Datos Laborales</span>
+                <div className="section-divider__line"></div>
+              </div>
+              <div className="emp-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Cargo</label>
+                  <label className="field-label">Cargo</label>
                   <select className="form-input form-select"
                     value={staffForm.role}
                     onChange={e => setStaffForm(f => ({ ...f, role: e.target.value as StaffFormData['role'] }))}>
@@ -419,19 +432,19 @@ export default function PersonalContent() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Sueldo ($)</label>
-                  <input className="form-input" type="number" min={0}
-                    value={staffForm.salary}
+                  <label className="field-label">Sueldo ($)</label>
+                  <input className="form-input" type="number" min={0} placeholder="0"
+                    value={staffForm.salary || ''}
                     onChange={e => setStaffForm(f => ({ ...f, salary: parseFloat(e.target.value) || 0 }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Horario</label>
+                  <label className="field-label">Horario</label>
                   <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00"
                     value={staffForm.schedule}
                     onChange={e => setStaffForm(f => ({ ...f, schedule: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Estado</label>
+                  <label className="field-label">Estado</label>
                   <select className="form-input form-select"
                     value={staffForm.status}
                     onChange={e => setStaffForm(f => ({ ...f, status: e.target.value as StaffFormData['status'] }))}>
@@ -442,13 +455,13 @@ export default function PersonalContent() {
                   </select>
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Notas</label>
-                <textarea className="form-input form-textarea" placeholder="Observaciones..."
+              <div className="form-group emp-form-col-2">
+                <label className="field-label">Notas</label>
+                <textarea className="form-input form-textarea" placeholder="Observaciones..." rows={2}
                   value={staffForm.notes}
                   onChange={e => setStaffForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
-              <div className="modal__actions">
+              <div className="emp-modal__footer">
                 <button type="button" className="btn btn--ghost" onClick={closeModal}>Cancelar</button>
                 <button type="submit" className="btn btn--primary">
                   Crear empleado
@@ -461,47 +474,60 @@ export default function PersonalContent() {
 
       {modal === 'editStaff' && selectedStaff && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal--wide" onClick={e => e.stopPropagation()}>
-            <div className="modal__header">
-              <h3>Editar Empleado</h3>
+          <div className="modal emp-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal__header emp-modal__heading">
+              <div className="emp-modal__icon"><UserCog size={20} /></div>
+              <div>
+                <h3 style={{margin: 0}}>Editar Empleado</h3>
+                <span className="emp-modal__subtitle">Actualice los datos del empleado</span>
+              </div>
               <button className="modal__close" onClick={closeModal}><X size={18} /></button>
             </div>
-            <form onSubmit={handleSaveStaff} className="modal__body">
-              <div className="form-grid-2">
+            <form onSubmit={handleSaveStaff} className="emp-modal__body">
+              <div className="section-divider">
+                <span className="section-divider__label">Datos Personales</span>
+                <div className="section-divider__line"></div>
+              </div>
+              <div className="emp-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Nombre completo *</label>
+                  <label className="field-label">Nombre completo<span className="field-label__req">*</span></label>
                   <input className="form-input" required placeholder="Ej: Juan Pérez"
                     value={staffForm.name}
                     onChange={e => setStaffForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">DNI *</label>
+                  <label className="field-label">DNI<span className="field-label__req">*</span></label>
                   <input className="form-input" required placeholder="20-12345678-9"
                     value={staffForm.dni}
                     onChange={e => setStaffForm(f => ({ ...f, dni: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Teléfono</label>
+                  <label className="field-label">Teléfono</label>
                   <input className="form-input" placeholder="11-4567-8901"
                     value={staffForm.phone}
                     onChange={e => setStaffForm(f => ({ ...f, phone: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className="field-label">Email</label>
                   <input className="form-input" type="email" placeholder="email@ejemplo.com"
                     value={staffForm.email}
                     onChange={e => setStaffForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Dirección</label>
+              <div className="form-group emp-form-col-2">
+                <label className="field-label">Dirección</label>
                 <input className="form-input" placeholder="Av. Corrientes 1234, CABA"
                   value={staffForm.address}
                   onChange={e => setStaffForm(f => ({ ...f, address: e.target.value }))} />
               </div>
-              <div className="form-grid-2">
+              
+              <div className="section-divider">
+                <span className="section-divider__label">Datos Laborales</span>
+                <div className="section-divider__line"></div>
+              </div>
+              <div className="emp-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Cargo</label>
+                  <label className="field-label">Cargo</label>
                   <select className="form-input form-select"
                     value={staffForm.role}
                     onChange={e => setStaffForm(f => ({ ...f, role: e.target.value as StaffFormData['role'] }))}>
@@ -513,19 +539,19 @@ export default function PersonalContent() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Sueldo ($)</label>
-                  <input className="form-input" type="number" min={0}
-                    value={staffForm.salary}
+                  <label className="field-label">Sueldo ($)</label>
+                  <input className="form-input" type="number" min={0} placeholder="0"
+                    value={staffForm.salary || ''}
                     onChange={e => setStaffForm(f => ({ ...f, salary: parseFloat(e.target.value) || 0 }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Horario</label>
+                  <label className="field-label">Horario</label>
                   <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00"
                     value={staffForm.schedule}
                     onChange={e => setStaffForm(f => ({ ...f, schedule: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Estado</label>
+                  <label className="field-label">Estado</label>
                   <select className="form-input form-select"
                     value={staffForm.status}
                     onChange={e => setStaffForm(f => ({ ...f, status: e.target.value as StaffFormData['status'] }))}>
@@ -536,13 +562,13 @@ export default function PersonalContent() {
                   </select>
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Notas</label>
-                <textarea className="form-input form-textarea" placeholder="Observaciones..."
+              <div className="form-group emp-form-col-2">
+                <label className="field-label">Notas</label>
+                <textarea className="form-input form-textarea" placeholder="Observaciones..." rows={2}
                   value={staffForm.notes}
                   onChange={e => setStaffForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
-              <div className="modal__actions">
+              <div className="emp-modal__footer">
                 <button type="button" className="btn btn--ghost" onClick={closeModal}>Cancelar</button>
                 <button type="submit" className="btn btn--primary">
                   Guardar cambios
