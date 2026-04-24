@@ -16,3 +16,5 @@ export const {
   organization: orgClient,
   admin: adminOps,
 } = authClient;
+
+export const signInSocial = authClient.signIn.social;
