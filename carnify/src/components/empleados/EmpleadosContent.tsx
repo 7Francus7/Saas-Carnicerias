@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   Users2, UserPlus, Shield, Trash2, Edit3, X,
   Eye, EyeOff, Check, AlertTriangle, MonitorPlay,
+  LayoutDashboard, ShoppingCart, Package, TrendingDown,
+  Users, UserCog, Landmark, FileText,
 } from "lucide-react";
 import {
   getOrgMembers,
@@ -45,6 +47,17 @@ const EMPTY_FORM = {
   status: "Activo",
   notes: "",
   sections: [] as SectionKey[]
+};
+
+const SECTION_ICONS: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
+  dashboard: LayoutDashboard,
+  pos:       ShoppingCart,
+  productos: Package,
+  costos:    TrendingDown,
+  clientes:  Users,
+  personal:  UserCog,
+  caja:      Landmark,
+  reportes:  FileText,
 };
 
 export default function EmpleadosContent() {
@@ -241,111 +254,97 @@ export default function EmpleadosContent() {
       {/* ── Modal: Create Employee ── */}
       {modal === "create" && (
         <ModalOverlay onClose={closeModal}>
-          <div style={{ background: "var(--bg-card)", borderRadius: 16, width: "min(580px, 95vw)", overflow: "hidden" }}>
-            {/* Header */}
-            <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-tertiary)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--primary-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <UserPlus size={16} color="var(--primary)" />
+          <div className="modal emp-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal__header">
+              <div className="emp-modal__heading">
+                <div className="emp-modal__icon">
+                  <UserPlus size={18} color="var(--primary)" />
                 </div>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Nuevo Empleado</h2>
+                <div>
+                  <h2 className="modal__title">Nuevo Empleado</h2>
+                  <span className="emp-modal__subtitle">Completá los datos del nuevo miembro</span>
+                </div>
               </div>
-              <button onClick={closeModal} style={{ width: 30, height: 30, borderRadius: 7, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
-                <X size={16} />
-              </button>
+              <button className="modal__close" onClick={closeModal}><X size={18} /></button>
             </div>
 
-            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20, maxHeight: "72vh", overflowY: "auto" }}>
-
-              {/* Sección: Acceso */}
-              <div>
-                <SectionDivider label="Acceso al sistema" />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ gridColumn: "span 2" }}>
-                    <FieldLabel required>Nombre completo</FieldLabel>
-                    <input className="form-input" placeholder="Ej: Juan Pérez" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-                  </div>
-                  <div>
-                    <FieldLabel required>Email</FieldLabel>
-                    <input className="form-input" type="email" placeholder="email@ejemplo.com" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-                  </div>
-                  <div>
-                    <FieldLabel required>Contraseña</FieldLabel>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        className="form-input"
-                        type={showPass ? "text" : "password"}
-                        placeholder="Mínimo 8 caracteres"
-                        value={form.password}
-                        onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                        style={{ paddingRight: 40 }}
-                      />
-                      <button type="button" onClick={() => setShowPass((p) => !p)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}>
-                        {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
+            <div className="emp-modal__body">
+              <SectionDivider label="Acceso al sistema" />
+              <div className="emp-form-grid">
+                <div className="emp-form-col-2">
+                  <FieldLabel required>Nombre completo</FieldLabel>
+                  <input className="form-input" placeholder="Ej: Juan Pérez" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel required>Email</FieldLabel>
+                  <input className="form-input" type="email" placeholder="email@ejemplo.com" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel required>Contraseña</FieldLabel>
+                  <div className="emp-pass-wrap">
+                    <input
+                      className="form-input"
+                      type={showPass ? "text" : "password"}
+                      placeholder="Mínimo 8 caracteres"
+                      value={form.password}
+                      onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                      style={{ paddingRight: 40 }}
+                    />
+                    <button type="button" onClick={() => setShowPass((p) => !p)} className="emp-pass-toggle">
+                      {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Sección: Datos personales */}
-              <div>
-                <SectionDivider label="Datos personales" />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <FieldLabel>DNI</FieldLabel>
-                    <input className="form-input" placeholder="20-12345678-9" value={form.dni} onChange={(e) => setForm((p) => ({ ...p, dni: e.target.value }))} />
-                  </div>
-                  <div>
-                    <FieldLabel>Teléfono</FieldLabel>
-                    <input className="form-input" placeholder="11-4567-8901" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
-                  </div>
-                  <div style={{ gridColumn: "span 2" }}>
-                    <FieldLabel>Dirección</FieldLabel>
-                    <input className="form-input" placeholder="Av. Corrientes 1234, CABA" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
-                  </div>
+              <SectionDivider label="Datos personales" />
+              <div className="emp-form-grid">
+                <div>
+                  <FieldLabel>DNI</FieldLabel>
+                  <input className="form-input" placeholder="20-12345678-9" value={form.dni} onChange={(e) => setForm((p) => ({ ...p, dni: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>Teléfono</FieldLabel>
+                  <input className="form-input" placeholder="11-4567-8901" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+                </div>
+                <div className="emp-form-col-2">
+                  <FieldLabel>Dirección</FieldLabel>
+                  <input className="form-input" placeholder="Av. Corrientes 1234, CABA" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
                 </div>
               </div>
 
-              {/* Sección: Información laboral */}
-              <div>
-                <SectionDivider label="Información laboral" />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <FieldLabel>Cargo</FieldLabel>
-                    <select className="form-input" value={form.position} onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}>
-                      <option value="">Seleccionar cargo</option>
-                      <option value="carnicero">Carnicero</option>
-                      <option value="administrador">Administrador</option>
-                      <option value="atencion">Atención al cliente</option>
-                    </select>
-                  </div>
-                  <div>
-                    <FieldLabel>Sueldo ($)</FieldLabel>
-                    <input className="form-input" type="number" placeholder="0" min="0" value={form.salary} onChange={(e) => setForm((p) => ({ ...p, salary: e.target.value }))} />
-                  </div>
-                  <div>
-                    <FieldLabel>Horario</FieldLabel>
-                    <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00" value={form.schedule} onChange={(e) => setForm((p) => ({ ...p, schedule: e.target.value }))} />
-                  </div>
-                  <div>
-                    <FieldLabel>Estado</FieldLabel>
-                    <select className="form-input" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
-                      <option value="Activo">Activo</option>
-                      <option value="Inactivo">Inactivo</option>
-                    </select>
-                  </div>
+              <SectionDivider label="Información laboral" />
+              <div className="emp-form-grid">
+                <div>
+                  <FieldLabel>Cargo</FieldLabel>
+                  <select className="form-input" value={form.position} onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}>
+                    <option value="">Seleccionar cargo</option>
+                    <option value="carnicero">Carnicero</option>
+                    <option value="administrador">Administrador</option>
+                    <option value="atencion">Atención al cliente</option>
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Sueldo ($)</FieldLabel>
+                  <input className="form-input" type="number" placeholder="0" min="0" value={form.salary} onChange={(e) => setForm((p) => ({ ...p, salary: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>Horario</FieldLabel>
+                  <input className="form-input" placeholder="Ej: Lun-Sáb 08:00-16:00" value={form.schedule} onChange={(e) => setForm((p) => ({ ...p, schedule: e.target.value }))} />
+                </div>
+                <div>
+                  <FieldLabel>Estado</FieldLabel>
+                  <select className="form-input" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Sección: Permisos */}
-              <div>
-                <SectionDivider label="Secciones habilitadas" />
-                <SectionsGrid selected={form.sections} onToggle={toggleSection} />
-              </div>
+              <SectionDivider label="Secciones habilitadas" />
+              <SectionsGrid selected={form.sections} onToggle={toggleSection} />
 
-              {/* Notas */}
-              <div>
+              <div style={{ marginTop: 4 }}>
                 <FieldLabel>Notas</FieldLabel>
                 <textarea className="form-input" rows={3} placeholder="Observaciones..." value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} style={{ resize: "vertical" }} />
               </div>
@@ -353,10 +352,9 @@ export default function EmpleadosContent() {
               {error && <ErrorBanner message={error} />}
             </div>
 
-            {/* Footer */}
-            <div style={{ padding: "14px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: 10, justifyContent: "flex-end", background: "var(--bg-tertiary)" }}>
-              <button className="btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
-              <button className="btn--primary" onClick={handleCreate} disabled={saving}>
+            <div className="emp-modal__footer">
+              <button className="btn btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
+              <button className="btn btn--primary" onClick={handleCreate} disabled={saving}>
                 {saving ? "Creando..." : "Crear empleado"}
               </button>
             </div>
@@ -367,30 +365,23 @@ export default function EmpleadosContent() {
       {/* ── Modal: Edit Permissions ── */}
       {modal === "editPerms" && selected && (
         <ModalOverlay onClose={closeModal}>
-          <div className="modal__header">
-            <div>
-              <h2 className="modal__title">Permisos de {selected.name}</h2>
-              <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "2px 0 0" }}>{selected.email}</p>
-            </div>
-            <button className="modal__close" onClick={closeModal}><X size={18} /></button>
-          </div>
-          <div className="modal__content">
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal__header">
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10 }}>
-                  Secciones habilitadas
-                </p>
-                <SectionsGrid selected={form.sections} onToggle={toggleSection} />
+                <h2 className="modal__title">Permisos de {selected.name}</h2>
+                <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "2px 0 0" }}>{selected.email}</p>
               </div>
-
+              <button className="modal__close" onClick={closeModal}><X size={18} /></button>
+            </div>
+            <div className="emp-modal__body">
+              <SectionsGrid selected={form.sections} onToggle={toggleSection} />
               {error && <ErrorBanner message={error} />}
-
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 8 }}>
-                <button className="btn--ghost btn--sm" onClick={closeModal} disabled={saving}>Cancelar</button>
-                <button className="btn--primary btn--sm" onClick={handleEditPerms} disabled={saving}>
-                  {saving ? "Guardando..." : "Guardar permisos"}
-                </button>
-              </div>
+            </div>
+            <div className="emp-modal__footer">
+              <button className="btn btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
+              <button className="btn btn--primary" onClick={handleEditPerms} disabled={saving}>
+                {saving ? "Guardando..." : "Guardar permisos"}
+              </button>
             </div>
           </div>
         </ModalOverlay>
@@ -399,29 +390,29 @@ export default function EmpleadosContent() {
       {/* ── Modal: Delete Confirm ── */}
       {modal === "deleteConfirm" && selected && (
         <ModalOverlay onClose={closeModal}>
-          <div className="modal__header">
-            <h2 className="modal__title">Eliminar empleado</h2>
-            <button className="modal__close" onClick={closeModal}><X size={18} /></button>
-          </div>
-          <div className="modal__content">
-            <div style={{ display: "flex", gap: 14, padding: "8px 0 16px" }}>
-              <AlertTriangle size={40} color="var(--warning)" style={{ flexShrink: 0 }} />
-              <div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px" }}>
-                  ¿Eliminar a {selected.name}?
-                </p>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-                  Se le revocará el acceso al sistema. Esta acción no se puede deshacer.
-                </p>
-              </div>
+          <div className="modal modal--sm" onClick={e => e.stopPropagation()}>
+            <div className="modal__header">
+              <h2 className="modal__title">Eliminar empleado</h2>
+              <button className="modal__close" onClick={closeModal}><X size={18} /></button>
             </div>
-
-            {error && <ErrorBanner message={error} />}
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button className="btn--ghost btn--sm" onClick={closeModal} disabled={saving}>Cancelar</button>
-              <button className="btn--danger btn--sm" onClick={handleDelete} disabled={saving}>
-                {saving ? "Eliminando..." : "Eliminar"}
+            <div className="emp-modal__body">
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <AlertTriangle size={36} color="var(--danger)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
+                    ¿Eliminar a {selected.name}?
+                  </p>
+                  <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
+                    Se le revocará el acceso al sistema. Esta acción no se puede deshacer.
+                  </p>
+                </div>
+              </div>
+              {error && <ErrorBanner message={error} />}
+            </div>
+            <div className="emp-modal__footer">
+              <button className="btn btn--ghost" onClick={closeModal} disabled={saving}>Cancelar</button>
+              <button className="btn btn--danger" onClick={handleDelete} disabled={saving}>
+                {saving ? "Eliminando..." : <><Trash2 size={14} /> Eliminar</>}
               </button>
             </div>
           </div>
@@ -569,32 +560,22 @@ function SectionsGrid({
   onToggle: (k: SectionKey) => void;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+    <div className="sections-grid">
       {AVAILABLE_SECTIONS.map((s) => {
         const active = selected.includes(s.key);
+        const Icon = SECTION_ICONS[s.key];
         return (
           <button
             key={s.key}
             type="button"
             onClick={() => onToggle(s.key)}
-            style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 14px", borderRadius: 8, cursor: "pointer",
-              border: `1px solid ${active ? "var(--primary)" : "var(--border)"}`,
-              background: active ? "var(--primary-soft)" : "var(--bg-tertiary)",
-              color: active ? "var(--primary)" : "var(--text-secondary)",
-              fontWeight: 500, fontSize: 13, textAlign: "left",
-              transition: "all 150ms",
-            }}
+            className={`section-btn ${active ? "section-btn--active" : ""}`}
           >
-            <div style={{
-              width: 18, height: 18, borderRadius: 4,
-              border: `1.5px solid ${active ? "var(--primary)" : "var(--border)"}`,
-              background: active ? "var(--primary)" : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              {active && <Check size={11} color="white" strokeWidth={3} />}
+            <div className={`section-btn__icon ${active ? "section-btn__icon--active" : ""}`}>
+              {active
+                ? <Check size={13} color="white" strokeWidth={2.5} />
+                : Icon && <Icon size={13} />
+              }
             </div>
             {s.label}
           </button>
@@ -606,17 +587,17 @@ function SectionsGrid({
 
 function SectionDivider({ label }: { label: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--text-muted)", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</span>
-      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+    <div className="section-divider">
+      <span className="section-divider__label">{label}</span>
+      <div className="section-divider__line" />
     </div>
   );
 }
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: "var(--text-secondary)", textTransform: "uppercase", marginBottom: 6, display: "block" }}>
-      {children}{required && <span style={{ color: "var(--primary)", marginLeft: 2 }}>*</span>}
+    <label className="field-label">
+      {children}{required && <span className="field-label__req">*</span>}
     </label>
   );
 }
@@ -624,9 +605,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
