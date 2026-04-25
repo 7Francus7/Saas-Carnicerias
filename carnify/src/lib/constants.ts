@@ -1,5 +1,18 @@
 // ── Navigation Items ──
-export const NAV_ITEMS = [
+export interface NavItem {
+  label: string;
+  icon: string;
+  href: string;
+  badge: string | null;
+  sectionKey: string;
+}
+
+export interface NavSection {
+  section: string;
+  items: NavItem[];
+}
+
+export const NAV_ITEMS: NavSection[] = [
   {
     section: "Principal",
     items: [
@@ -55,14 +68,14 @@ export const MOCK_STATS = {
   clients: { value: 0, trend: 0, trendDirection: "up" as const, label: "Clientes Atendidos" },
 };
 
-export const MOCK_HOURLY_SALES: any[] = [];
-export const MOCK_WEEKLY_SALES: any[] = [];
-export const MOCK_TOP_PRODUCTS: any[] = [];
-export const MOCK_STOCK_ALERTS: any[] = [];
-export const MOCK_RECENT_SALES: any[] = [];
-export const MOCK_ACTIVITY: any[] = [];
-export const MOCK_PAYMENT_BREAKDOWN: any[] = [];
-export const MOCK_STOCK_LEVELS: any[] = [];
+export const MOCK_HOURLY_SALES: Array<Record<string, never>> = [];
+export const MOCK_WEEKLY_SALES: Array<Record<string, never>> = [];
+export const MOCK_TOP_PRODUCTS: Array<Record<string, never>> = [];
+export const MOCK_STOCK_ALERTS: Array<Record<string, never>> = [];
+export const MOCK_RECENT_SALES: Array<Record<string, never>> = [];
+export const MOCK_ACTIVITY: Array<Record<string, never>> = [];
+export const MOCK_PAYMENT_BREAKDOWN: Array<Record<string, never>> = [];
+export const MOCK_STOCK_LEVELS: Array<Record<string, never>> = [];
 
 export const POS_PRODUCTS = [
   // Vacuno

@@ -1,9 +1,34 @@
 "use client";
 
+import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { Store, ArrowLeft, Mail, Shield } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Shield, Store } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      await authClient.requestPasswordReset({
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setSent(true);
+    } catch {
+      setError("No pudimos iniciar la recuperacion. Intentalo de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-card auth-card--wide">
@@ -14,7 +39,7 @@ export default function ForgotPasswordPage() {
                 <Store size={48} color="white" />
               </div>
               <h1 className="auth-hero__title">Carnify</h1>
-              <p className="auth-hero__subtitle">Gestión integral para tu carnicería</p>
+              <p className="auth-hero__subtitle">Recupera el acceso sin detener la operacion.</p>
             </div>
           </div>
         </div>
@@ -26,42 +51,66 @@ export default function ForgotPasswordPage() {
           </div>
 
           <div style={{ textAlign: "center", padding: "8px 0 24px" }}>
-            <div style={{
-              width: 64, height: 64,
-              background: "rgba(220, 38, 38, 0.1)",
-              borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 20px"
-            }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                background: "rgba(220, 38, 38, 0.1)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 20px",
+              }}
+            >
               <Shield size={32} color="var(--primary)" />
             </div>
-            <h1 className="auth-title">Recuperar contraseña</h1>
+            <h1 className="auth-title">Recuperar contrasena</h1>
             <p className="auth-subtitle" style={{ marginBottom: 24 }}>
-              El restablecimiento por email no está habilitado. Contactá al administrador del sistema para restablecer tu contraseña.
+              Introduce tu email y te enviaremos un enlace para elegir una nueva contrasena.
             </p>
 
-            <div style={{
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-md)",
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 24,
-              textAlign: "left",
-            }}>
-              <Mail size={20} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: 2 }}>Administrador del sistema</div>
-                <div style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9rem" }}>
-                  Pedile al dueño que restablezca tu contraseña desde el panel de super-admin.
+            {sent ? (
+              <div className="auth-success-box">
+                <Mail size={20} />
+                <div>
+                  <strong>Revisa tu email</strong>
+                  <p>
+                    Si la cuenta existe, te enviamos un enlace de recuperacion. Revisa tambien spam o promociones.
+                  </p>
                 </div>
               </div>
-            </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="auth-form">
+                <div className="auth-field" style={{ textAlign: "left" }}>
+                  <label className="auth-label">Email</label>
+                  <div className="auth-input-wrap">
+                    <Mail size={18} className="auth-input-icon" />
+                    <input
+                      type="email"
+                      className="auth-input auth-input--with-icon"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="tu@email.com"
+                      required
+                    />
+                  </div>
+                </div>
 
-            <Link href="/login" className="btn btn--primary btn--full btn--large" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <ArrowLeft size={16} /> Volver al inicio de sesión
+                {error && <p className="auth-error">{error}</p>}
+
+                <button type="submit" className="btn btn--primary btn--full btn--large" disabled={loading}>
+                  {loading ? <Loader2 size={20} className="animate-spin" /> : "Enviar enlace de recuperacion"}
+                </button>
+              </form>
+            )}
+
+            <Link
+              href="/login"
+              className="btn btn--ghost btn--full btn--large"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16 }}
+            >
+              <ArrowLeft size={16} /> Volver al inicio de sesion
             </Link>
           </div>
         </div>

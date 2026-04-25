@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import "./globals.css";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import ThemeProvider from "@/components/layout/ThemeProvider";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Carnify — Sistema de Gestión para Carnicerías",
-  description: "El sistema más completo para gestionar tu carnicería. Control de ventas, stock, desposte, costos y más.",
+  title: "Carnify | Sistema de Gestion para Carnicerias",
+  description: "Sistema para gestionar ventas, caja, productos, clientes y costos en carnicerias.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -26,7 +28,11 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -16,7 +16,23 @@ import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
 import { getCurrentSession } from "@/actions/caja";
 import { useSession } from "@/lib/auth-client";
 
-function CustomTooltip({ active, payload, label }: any) {
+type ChartPoint = { hour: string; ventas: number };
+type PaymentSlice = { method: string; amount: number; percentage: number; color: string };
+type RecentSale = {
+  id: string;
+  time: string;
+  items: number;
+  total: number;
+  payment: string;
+  client: string | null;
+};
+type TooltipEntry = { color?: string; name?: string; value?: number };
+
+function CustomTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+}) {
   if (active && payload && payload.length) {
     return (
       <div style={{
@@ -28,9 +44,9 @@ function CustomTooltip({ active, payload, label }: any) {
         boxShadow: "var(--shadow-lg)",
       }}>
         <p style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{label}</p>
-        {payload.map((entry: any, idx: number) => (
+        {payload.map((entry, idx: number) => (
           <p key={idx} style={{ color: entry.color, fontWeight: 600 }}>
-            {entry.name === "ventas" ? formatCurrency(entry.value) : entry.value}
+            {entry.name === "ventas" ? formatCurrency(entry.value ?? 0) : entry.value}
           </p>
         ))}
       </div>
@@ -71,9 +87,8 @@ function StatCard({ stat, type, delay }: {
 }
 
 function LiveClock() {
-  const [time, setTime] = useState<Date | null>(null);
+  const [time, setTime] = useState(() => new Date());
   useEffect(() => {
-    setTime(new Date());
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -83,17 +98,17 @@ function LiveClock() {
       <Clock size={16} style={{ color: "var(--text-tertiary)" }} />
       <div>
         <div className="live-clock__time">
-          {time?.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz }) ?? ""}
+          {time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })}
         </div>
         <div className="live-clock__date" style={{ textTransform: "capitalize" }}>
-          {time?.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz }) ?? ""}
+          {time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
         </div>
       </div>
     </div>
   );
 }
 
-function SalesChart({ data }: { data: any[] }) {
+function SalesChart({ data }: { data: ChartPoint[] }) {
   const displayData = data.length > 0 ? data : [{ hour: "08:00", ventas: 0 }, { hour: "20:00", ventas: 0 }];
 
   return (
@@ -143,7 +158,7 @@ function SalesChart({ data }: { data: any[] }) {
   );
 }
 
-function RightPanel({ paymentData }: { paymentData: any[] }) {
+function RightPanel({ paymentData }: { paymentData: PaymentSlice[] }) {
   const router = useRouter();
   const actions = [
     { icon: <ShoppingCart size={18} />, cls: "pos", title: "Nueva Venta", desc: "Abrir punto de venta", href: "/pos" },
@@ -229,7 +244,7 @@ function RightPanel({ paymentData }: { paymentData: any[] }) {
   );
 }
 
-function RecentSalesCard({ sales }: { sales: any[] }) {
+function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
   const router = useRouter();
   return (
     <div className="card animate-in animate-in-delay-2">
@@ -309,7 +324,7 @@ export default function DashboardContent() {
     else hydrate(null, []);
   }, [hydrate]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
+  useEffect(() => { void loadSession(); }, [loadSession]);
 
   const { data: session } = useSession();
 
@@ -326,7 +341,9 @@ export default function DashboardContent() {
     if (!currentSession || currentSession.ventas.length === 0) {
       return {
         revenue: 0, orders: 0, ticket: 0, clients: 0,
-        hourlySales: [], recentSales: [], paymentBreakdown: []
+        hourlySales: [] as ChartPoint[],
+        recentSales: [] as RecentSale[],
+        paymentBreakdown: [] as PaymentSlice[],
       };
     }
 
@@ -360,7 +377,7 @@ export default function DashboardContent() {
       }
     });
 
-    const colors: any = {
+    const colors: Record<string, string> = {
       "Efectivo": "#22C55E",
       "Transferencia": "#3B82F6",
       "Tarjeta": "#F59E0B",
@@ -368,12 +385,12 @@ export default function DashboardContent() {
       "Cuenta Corriente": "#EF4444"
     };
 
-    const paymentBreakdown = Object.entries(paymentMap).map(([m, val]) => ({
+    const paymentBreakdown: PaymentSlice[] = Object.entries(paymentMap).map(([m, val]) => ({
        method: m, amount: val, percentage: ventas > 0 ? parseFloat(((val/ventas)*100).toFixed(1)) : 0, color: colors[m] || "#888"
     })).sort((a,b) => b.amount - a.amount);
 
     // ultimas transacciones (top 5)
-    const recentSales = [...currentSession.ventas].reverse().map(v => ({
+    const recentSales: RecentSale[] = [...currentSession.ventas].reverse().map(v => ({
        id: `TK-${v.id.substring(0,4).toUpperCase()}`,
        time: new Date(v.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
        items: v.itemCount || 1,

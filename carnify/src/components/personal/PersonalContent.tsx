@@ -66,7 +66,8 @@ export default function PersonalContent() {
     hydrate(data.map(mapDbStaff));
   }, [hydrate]);
 
-  useEffect(() => { loadStaff(); }, [loadStaff]);
+  useEffect(() => { void loadStaff(); }, [loadStaff]);
+  const [now] = useState(() => Date.now());
 
   const selectedStaff = useMemo(
     () => staff.find(p => p.id === selectedStaffId) ?? null,
@@ -142,7 +143,7 @@ export default function PersonalContent() {
   }
 
   function relativeDate(dateStr: string): string {
-    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    const days = Math.floor((now - new Date(dateStr).getTime()) / 86400000);
     if (days === 0) return 'Hoy';
     if (days === 1) return 'Ayer';
     if (days < 7) return `Hace ${days} días`;
@@ -150,7 +151,7 @@ export default function PersonalContent() {
     return `Hace ${Math.floor(days / 30)} meses`;
   }
 
-  const FilterTab = ({ value, label, count }: { value: FilterType; label: string; count: number }) => (
+  const renderFilterTab = (value: FilterType, label: string, count: number) => (
     <button
       className={`filter-tab ${filter === value ? 'filter-tab--active' : ''}`}
       onClick={() => setFilter(value)}
@@ -186,9 +187,9 @@ export default function PersonalContent() {
           </div>
 
           <div className="filter-tabs">
-            <FilterTab value="all" label="Todos" count={sidebarStats.total} />
-            <FilterTab value="active" label="Activos" count={sidebarStats.active} />
-            <FilterTab value="inactive" label="Inactivos" count={sidebarStats.total - sidebarStats.active} />
+            {renderFilterTab('all', 'Todos', sidebarStats.total)}
+            {renderFilterTab('active', 'Activos', sidebarStats.active)}
+            {renderFilterTab('inactive', 'Inactivos', sidebarStats.total - sidebarStats.active)}
           </div>
         </div>
 
@@ -312,7 +313,7 @@ export default function PersonalContent() {
                 <div>
                   <div className="summary-card__label">Antigüedad</div>
                   <div className="summary-card__value">
-                    {Math.floor((Date.now() - new Date(selectedStaff.hireDate).getTime()) / (365.25 * 86400000))} años
+                    {Math.floor((now - new Date(selectedStaff.hireDate).getTime()) / (365.25 * 86400000))} años
                   </div>
                 </div>
               </div>

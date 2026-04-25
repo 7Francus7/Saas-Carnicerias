@@ -16,8 +16,18 @@ import type { SectionKey } from "@/lib/sections";
 import { useImpersonationStore } from "@/stores/useImpersonationStore";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
-  LayoutDashboard, ShoppingCart, Store, Package, Beef,
-  Calculator, Users, Users2, Truck, UserCog, Wallet, BarChart3,
+  LayoutDashboard,
+  ShoppingCart,
+  Store,
+  Package,
+  Beef,
+  Calculator,
+  Users,
+  Users2,
+  Truck,
+  UserCog,
+  Wallet,
+  BarChart3,
 };
 
 export default function Sidebar() {
@@ -25,10 +35,10 @@ export default function Sidebar() {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
   const { data: session } = useSession();
+  const { viewingAs, stopViewAs } = useImpersonationStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [permissions, setPermissions] = useState<SectionKey[] | "all">("all");
-  const { viewingAs, stopViewAs } = useImpersonationStore();
 
   useEffect(() => {
     getMyPermissions()
@@ -36,23 +46,28 @@ export default function Sidebar() {
       .catch(() => setPermissions("all"));
   }, [session?.session?.activeOrganizationId]);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
   const activePermissions: SectionKey[] | "all" = viewingAs
     ? viewingAs.sections
     : permissions;
 
   const userName = session?.user?.name ?? "Usuario";
-  const orgName = (session as any)?.session?.activeOrganizationId ? "Mi Carnicería" : "Carnify";
-  const iniciales = userName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+  const activeOrganizationId = session?.session?.activeOrganizationId;
+  const orgName = activeOrganizationId ? "Mi Carniceria" : "Carnify";
+  const iniciales = userName
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const closeMobile = () => setMobileOpen(false);
 
   const canAccess = (sectionKey: string) => {
     if (viewingAs) {
       if (sectionKey === "empleados") return false;
       return viewingAs.sections.includes(sectionKey as SectionKey);
     }
+
     if (activePermissions === "all") return true;
     if (sectionKey === "empleados") return false;
     return activePermissions.includes(sectionKey as SectionKey);
@@ -71,16 +86,13 @@ export default function Sidebar() {
     router.refresh();
   };
 
-  const closeMobile = () => setMobileOpen(false);
-
   return (
     <>
-      {/* Mobile top header - only shown on small screens */}
       <header className="mobile-header">
         <button
           className="mobile-header__menu-btn"
           onClick={() => setMobileOpen(true)}
-          aria-label="Abrir menú"
+          aria-label="Abrir menu"
         >
           <Menu size={20} />
         </button>
@@ -93,7 +105,6 @@ export default function Sidebar() {
         <div style={{ width: 40 }} />
       </header>
 
-      {/* Overlay */}
       {mobileOpen && (
         <div
           className="mobile-menu-overlay"
@@ -104,48 +115,71 @@ export default function Sidebar() {
       )}
 
       <aside className={`sidebar${mobileOpen ? " sidebar--open" : ""}`}>
-        {/* Impersonation banner */}
         {viewingAs && (
-          <div style={{
-            margin: "8px 10px 0",
-            background: "rgba(245,158,11,0.12)",
-            border: "1px solid rgba(245,158,11,0.35)",
-            borderRadius: 10,
-            padding: "10px 12px",
-          }}>
-            <p style={{ fontSize: 10, fontWeight: 700, color: "#F59E0B", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <div
+            style={{
+              margin: "8px 10px 0",
+              background: "rgba(245,158,11,0.12)",
+              border: "1px solid rgba(245,158,11,0.35)",
+              borderRadius: 10,
+              padding: "10px 12px",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#F59E0B",
+                margin: "0 0 2px",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
               Vista como empleado
             </p>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 8px" }}>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                margin: "0 0 8px",
+              }}
+            >
               {viewingAs.name}
             </p>
             <button
-              onClick={() => { stopViewAs(); router.push("/empleados"); closeMobile(); }}
+              onClick={() => {
+                stopViewAs();
+                router.push("/empleados");
+                closeMobile();
+              }}
               style={{
-                width: "100%", padding: "5px 0", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)",
-                color: "#F59E0B", cursor: "pointer",
+                width: "100%",
+                padding: "5px 0",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                background: "rgba(245,158,11,0.2)",
+                border: "1px solid rgba(245,158,11,0.4)",
+                color: "#F59E0B",
+                cursor: "pointer",
               }}
             >
-              ← Volver a mi cuenta
+              Volver a mi cuenta
             </button>
           </div>
         )}
 
-        {/* Logo */}
         <div className="sidebar__logo">
           <div className="sidebar__logo-icon">
             <Store size={20} color="white" />
           </div>
-          <div className="sidebar__logo-text">
-            Carnify
-          </div>
-          <button className="sidebar__close-btn" onClick={closeMobile} aria-label="Cerrar menú">
+          <div className="sidebar__logo-text">Carnify</div>
+          <button className="sidebar__close-btn" onClick={closeMobile} aria-label="Cerrar menu">
             <X size={18} />
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar__nav">
           {filteredNav.map((section) => (
             <div key={section.section}>
@@ -153,6 +187,7 @@ export default function Sidebar() {
               {section.items.map((item) => {
                 const Icon = ICON_MAP[item.icon];
                 const isActive = pathname === item.href;
+
                 return (
                   <Link
                     key={item.href}
@@ -165,9 +200,7 @@ export default function Sidebar() {
                     </span>
                     <span>{item.label}</span>
                     <span className="sidebar__link-right">
-                      {item.badge && (
-                        <span className="sidebar__badge">{item.badge}</span>
-                      )}
+                      {item.badge && <span className="sidebar__badge">{item.badge}</span>}
                       {isActive && <ChevronRight size={12} className="sidebar__chevron" />}
                     </span>
                   </Link>
@@ -177,7 +210,6 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer */}
         <div className="sidebar__footer">
           <button
             className="sidebar__link sidebar__theme-toggle"
@@ -189,14 +221,16 @@ export default function Sidebar() {
             </span>
             <span>{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
           </button>
+
           {permissions === "all" && !viewingAs && (
             <Link href="/config" className="sidebar__link" style={{ marginBottom: 4 }} onClick={closeMobile}>
               <span className="sidebar__link-icon-wrap">
                 <Settings size={16} />
               </span>
-              <span>Configuración</span>
+              <span>Configuracion</span>
             </Link>
           )}
+
           <div className="sidebar__user">
             <div className="sidebar__user-avatar">{iniciales}</div>
             <div className="sidebar__user-info">
@@ -205,8 +239,16 @@ export default function Sidebar() {
             </div>
             <button
               onClick={handleLogout}
-              style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center" }}
-              title="Cerrar sesión"
+              style={{
+                marginLeft: "auto",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+              }}
+              title="Cerrar sesion"
             >
               <LogOut size={16} />
             </button>

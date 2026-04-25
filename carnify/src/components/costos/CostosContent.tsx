@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  Calculator, TrendingUp, TrendingDown, DollarSign,
+  Calculator, TrendingUp, TrendingDown,
   Search, Edit2, ChevronDown, X, Check, Download,
   AlertTriangle, Loader2,
 } from "lucide-react";
@@ -75,7 +75,8 @@ export default function CostosContent() {
     setLoading(false);
   }, [hydrate, products, setProducts]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadData(); }, [loadData]);
 
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");

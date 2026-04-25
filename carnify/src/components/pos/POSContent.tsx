@@ -14,6 +14,7 @@ import { usePOSStore } from "@/stores/usePOSStore";
 import { useProductsStore } from "@/stores/useProductsStore";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
 import type { ClientProfile } from "@/stores/useClientStore";
+import type { Product } from "@/stores/useProductsStore";
 import { getProducts } from "@/actions/products";
 import { getCurrentSession, recordSale as dbRecordSale } from "@/actions/caja";
 import { getClients, addSaleToAccount as dbAddSaleToAccount } from "@/actions/clients";
@@ -41,6 +42,12 @@ export default function POSContent() {
   const setProducts = useProductsStore((s) => s.setProducts);
   const { currentSession, hydrate } = useCajaStore();
   const [clients, setClients] = useState<ClientProfile[]>([]);
+  const itemIdRef = useRef(0);
+
+  const createCartItemId = useCallback((productId: string) => {
+    itemIdRef.current += 1;
+    return `${productId}_${itemIdRef.current}`;
+  }, []);
 
   const loadSession = useCallback(async () => {
     const s = await getCurrentSession();
@@ -51,7 +58,7 @@ export default function POSContent() {
   useEffect(() => {
     loadSession();
     if (products.length === 0) {
-      getProducts().then((data) => setProducts(data as import("@/stores/useProductsStore").Product[]));
+      getProducts().then((data) => setProducts(data as Product[]));
     }
     getClients().then((data) =>
       setClients(
@@ -73,14 +80,13 @@ export default function POSContent() {
         }))
       )
     );
-  }, [loadSession]);
+  }, [loadSession, products.length, setProducts]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("todos");
   const [showWeightModal, setShowWeightModal] = useState(false);
-  const [activeProduct, setActiveProduct] = useState<typeof products[0] | null>(null);
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastVentaId, setLastVentaId] = useState<string | null>(null);
   const [paymentSplits, setPaymentSplits] = useState<{ method: string; amount: number }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
@@ -103,7 +109,7 @@ export default function POSContent() {
       const byPlu = pluMap.get(barcode.padStart(5, "0"));
       if (byPlu) {
         if (byPlu.unit === "un") {
-          addToCart({ id: `${byPlu.id}_${Date.now()}`, name: byPlu.name, price: byPlu.price, quantity: 1, unit: "un", emoji: byPlu.emoji });
+          addToCart({ id: createCartItemId(byPlu.id), name: byPlu.name, price: byPlu.price, quantity: 1, unit: "un", emoji: byPlu.emoji });
           setScanResult({ ok: true, product: byPlu, weightKg: 1, total: byPlu.price });
         } else {
           setScanResult({ ok: false, message: `${byPlu.name} requiere peso — usá el ticket de la balanza` });
@@ -118,7 +124,7 @@ export default function POSContent() {
       } else {
         const lineTotal = product.price * parsed.weightKg;
         addToCart({
-          id: `${product.id}_${Date.now()}`,
+          id: createCartItemId(product.id),
           name: product.name,
           price: product.price,
           quantity: parsed.weightKg,
@@ -129,7 +135,7 @@ export default function POSContent() {
       }
     }
     setTimeout(() => setScanResult(null), 3000);
-  }, [addToCart, pluMap]);
+  }, [addToCart, createCartItemId, pluMap]);
 
   // Global keydown listener — barcode scanners type the full code in < 80 ms
   useEffect(() => {
@@ -167,13 +173,13 @@ export default function POSContent() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleProductClick = (product: typeof products[0]) => {
+  const handleProductClick = (product: Product) => {
     if (product.unit === "kg") {
       setActiveProduct(product);
       setWeightValue("");
       setShowWeightModal(true);
     } else {
-      addToCart({ id: `${product.id}_${Date.now()}`, name: product.name, price: product.price, quantity: 1, unit: "un", emoji: product.emoji });
+      addToCart({ id: createCartItemId(product.id), name: product.name, price: product.price, quantity: 1, unit: "un", emoji: product.emoji });
     }
   };
 
@@ -181,7 +187,7 @@ export default function POSContent() {
     if (!activeProduct) return;
     const weight = parseFloat(weightValue.replace(",", "."));
     if (!isNaN(weight) && weight > 0) {
-      addToCart({ id: `${activeProduct.id}_${Date.now()}`, name: activeProduct.name, price: activeProduct.price, quantity: weight, unit: "kg", emoji: activeProduct.emoji });
+      addToCart({ id: createCartItemId(activeProduct.id), name: activeProduct.name, price: activeProduct.price, quantity: weight, unit: "kg", emoji: activeProduct.emoji });
       setShowWeightModal(false);
     }
   };
@@ -210,7 +216,6 @@ export default function POSContent() {
     }
 
     await loadSession();
-    setLastVentaId(`v-${Date.now()}`);
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
   };
@@ -219,7 +224,6 @@ export default function POSContent() {
     clearCart();
     setSelectedClientId(null);
     setShowSuccessModal(false);
-    setLastVentaId(null);
   };
 
   const handlePrintTicket = () => {

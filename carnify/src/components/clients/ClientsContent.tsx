@@ -46,10 +46,50 @@ const METHOD_ICONS: Record<string, string> = {
   other: '🔖',
 };
 
-function mapDbToProfile(c: any): ClientProfile {
+type DbClientMovement = {
+  id: string;
+  date: Date | string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  ticketId?: string | null;
+  paymentMethod?: string | null;
+  periodId?: string | null;
+};
+
+type DbClientPeriod = {
+  id: string;
+  label: string;
+  openedAt: Date | string;
+  closedAt: Date | string;
+  closedReason: string;
+  totalSales: number;
+  totalPaid: number;
+  finalBalance: number;
+};
+
+type DbClient = {
+  id: string;
+  name: string;
+  dni: string;
+  phone: string;
+  address: string;
+  email: string;
+  notes: string;
+  creditLimit: number;
+  balance: number;
+  status: string;
+  lastActivity: Date | string;
+  createdAt: Date | string;
+  movements: DbClientMovement[];
+  periods: DbClientPeriod[];
+};
+
+function mapDbToProfile(c: DbClient): ClientProfile {
   const currentMovements: ClientMovement[] = c.movements
-    .filter((m: any) => !m.periodId)
-    .map((m: any) => ({
+    .filter((m) => !m.periodId)
+    .map((m) => ({
       id: m.id,
       date: new Date(m.date).toISOString(),
       type: m.type as "sale" | "payment",
@@ -61,15 +101,15 @@ function mapDbToProfile(c: any): ClientProfile {
     }))
     .sort((a: ClientMovement, b: ClientMovement) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const periods: ClientPeriod[] = c.periods.map((p: any) => ({
+  const periods: ClientPeriod[] = c.periods.map((p) => ({
     id: p.id,
     label: p.label,
     openedAt: new Date(p.openedAt).toISOString(),
     closedAt: new Date(p.closedAt).toISOString(),
     closedReason: p.closedReason as "settled" | "month_end" | "manual",
     movements: c.movements
-      .filter((m: any) => m.periodId === p.id)
-      .map((m: any) => ({
+      .filter((m) => m.periodId === p.id)
+      .map((m) => ({
         id: m.id,
         date: new Date(m.date).toISOString(),
         type: m.type as "sale" | "payment",
@@ -123,8 +163,10 @@ export default function ClientsContent() {
   }, [hydrate]);
 
   useEffect(() => {
-    refreshClients();
-  }, []);
+    void refreshClients();
+  }, [refreshClients]);
+
+  const [now] = useState(() => Date.now());
 
   const selectedClient = useMemo(
     () => clients.find(c => c.id === selectedClientId) ?? null,
@@ -263,7 +305,7 @@ export default function ClientsContent() {
   // ── Helpers ───────────────────────────────────────────
 
   function relativeDate(dateStr: string): string {
-    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    const days = Math.floor((now - new Date(dateStr).getTime()) / 86400000);
     if (days === 0) return 'Hoy';
     if (days === 1) return 'Ayer';
     if (days < 7) return `Hace ${days} días`;
@@ -273,7 +315,7 @@ export default function ClientsContent() {
 
   // ── Sidebar ────────────────────────────────────────────
 
-  const FilterTab = ({ value, label, count }: { value: FilterType; label: string; count: number }) => (
+  const renderFilterTab = (value: FilterType, label: string, count: number) => (
     <button
       className={`filter-tab ${filter === value ? 'filter-tab--active' : ''}`}
       onClick={() => setFilter(value)}
@@ -285,7 +327,7 @@ export default function ClientsContent() {
 
   // ── Main receipt preview ───────────────────────────────
 
-  const ReceiptPreview = () => {
+  const renderReceiptPreview = () => {
     if (!selectedClient || !lastReceipt) return null;
     const { movement, prevBalance } = lastReceipt;
     return (
@@ -367,9 +409,9 @@ export default function ClientsContent() {
           </div>
 
           <div className="filter-tabs">
-            <FilterTab value="all" label="Todos" count={sidebarStats.total} />
-            <FilterTab value="debt" label="Con Deuda" count={sidebarStats.withDebt} />
-            <FilterTab value="overdue" label="En Mora" count={sidebarStats.overdue} />
+            {renderFilterTab('all', 'Todos', sidebarStats.total)}
+            {renderFilterTab('debt', 'Con Deuda', sidebarStats.withDebt)}
+            {renderFilterTab('overdue', 'En Mora', sidebarStats.overdue)}
           </div>
 
           {sidebarStats.totalDebt > 0 && (
@@ -992,7 +1034,7 @@ export default function ClientsContent() {
               <button className="modal__close" onClick={closeModal}><X size={18} /></button>
             </div>
             <div className="modal__body">
-              <ReceiptPreview />
+              {renderReceiptPreview()}
               <div className="modal__actions">
                 <button className="btn btn--ghost" onClick={closeModal}>Cerrar</button>
                 <button className="btn btn--outline" onClick={handleDownloadReceipt}>

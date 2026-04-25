@@ -2,14 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
-const SEED_SECRET = "carnify-reset-2026";
-const ADMIN_EMAIL = "dellorsif@gmail.com";
-const ADMIN_PASSWORD = "Admin1234!";
-const ADMIN_NAME = "Franco (Admin)";
-
 export async function GET(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "No disponible en producción" }, { status: 404 });
+  }
+
+  const seedSecret = process.env.ADMIN_SEED_SECRET;
+  const adminEmail = process.env.ADMIN_SEED_EMAIL;
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD;
+  const adminName = process.env.ADMIN_SEED_NAME ?? "Carnify Admin";
+
+  if (!seedSecret || !adminEmail || !adminPassword) {
+    return NextResponse.json(
+      { error: "Faltan variables de entorno para ejecutar el seed administrativo" },
+      { status: 500 }
+    );
+  }
+
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== SEED_SECRET) {
+  if (secret !== seedSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -40,22 +51,19 @@ export async function GET(req: NextRequest) {
       RESTART IDENTITY CASCADE
     `);
 
-    // 2. Create admin user via Better Auth
-    const result = await auth.api.signUpEmail({
-      body: { name: ADMIN_NAME, email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    await auth.api.signUpEmail({
+      body: { name: adminName, email: adminEmail, password: adminPassword },
     });
 
-    // 3. Promote to admin role
     await prisma.user.update({
-      where: { email: ADMIN_EMAIL },
+      where: { email: adminEmail },
       data: { role: "admin" },
     });
 
     return NextResponse.json({
       ok: true,
       message: "Base de datos limpia. Cuenta admin creada.",
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
+      email: adminEmail,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

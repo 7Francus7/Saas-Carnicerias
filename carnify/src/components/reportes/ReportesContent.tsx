@@ -7,7 +7,7 @@ import {
   Percent, Calendar
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
+  AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from "recharts";
@@ -57,7 +57,19 @@ const WEEKLY = [
 ];
 // weekMax computed dynamically in component now
 
-const TOP_PRODUCTS: any[] = [];
+type TopProduct = {
+  name: string;
+  emoji: string;
+  cat: string;
+  sold: number;
+  unit: string;
+  rev: number;
+  margin: number;
+};
+
+type ChartTooltipEntry = { value?: number };
+
+const TOP_PRODUCTS: TopProduct[] = [];
 
 type Period = "hoy" | "semana" | "mes" | "custom";
 type PaymentEntry = { method: string; amount: number; pct: number; color: string };
@@ -90,7 +102,11 @@ function buildCustomData(dateStr: string) {
   };
 }
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: ChartTooltipEntry[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
@@ -100,7 +116,7 @@ function CustomTooltip({ active, payload, label }: any) {
     }}>
       <p style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{label}</p>
       <p style={{ color: "#DC2626", fontWeight: 700 }}>
-        {formatCurrency(payload[0].value)}
+        {formatCurrency(payload[0].value ?? 0)}
       </p>
     </div>
   );

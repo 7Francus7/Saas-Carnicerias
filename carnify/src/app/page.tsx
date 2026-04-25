@@ -4,11 +4,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import DashboardContent from "@/components/dashboard/DashboardContent";
+import MarketingLanding from "@/components/marketing/MarketingLanding";
 
 export default async function Home() {
   const session = await auth.api.getSession({ headers: await headers() });
 
-  if (!session) redirect("/login");
+  if (!session) {
+    return <MarketingLanding />;
+  }
 
   if (session.user.role === "admin" && !session.session.activeOrganizationId) {
     redirect("/super-admin");

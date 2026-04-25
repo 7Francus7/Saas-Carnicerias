@@ -68,7 +68,8 @@ export default function ConfigContent() {
     setPosForm(p);
   }, [hydrate]);
 
-  useEffect(() => { loadSettings(); }, [loadSettings]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadSettings(); }, [loadSettings]);
 
   function showSaved(tab: TabId) {
     setSavedTab(tab);

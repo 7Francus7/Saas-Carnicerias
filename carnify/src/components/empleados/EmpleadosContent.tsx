@@ -142,8 +142,8 @@ export default function EmpleadosContent() {
       });
       await load();
       closeModal();
-    } catch (e: any) {
-      setError(e.message ?? "Error al crear empleado");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error al crear empleado");
     } finally {
       setSaving(false);
     }
@@ -157,8 +157,8 @@ export default function EmpleadosContent() {
       await updateEmployeePermissions(selected.id, form.sections);
       await load();
       closeModal();
-    } catch (e: any) {
-      setError(e.message ?? "Error al actualizar permisos");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error al actualizar permisos");
     } finally {
       setSaving(false);
     }
@@ -178,8 +178,8 @@ export default function EmpleadosContent() {
       await deleteEmployee(selected.id);
       await load();
       closeModal();
-    } catch (e: any) {
-      setError(e.message ?? "Error al eliminar empleado");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error al eliminar empleado");
     } finally {
       setSaving(false);
     }
