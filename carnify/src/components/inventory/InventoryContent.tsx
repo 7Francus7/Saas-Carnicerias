@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Package, Search, Plus, ArrowDownLeft,
   ArrowUpRight, AlertTriangle, History, X,
   Truck, Calendar, ChevronDown, Loader2,
 } from "lucide-react";
 import { formatNumber } from "@/lib/constants";
-import { getStockMovements, addStockMovement } from "@/actions/stock";
+import { getStockMovements, addStockMovement, getInventory } from "@/actions/stock";
 import { getProducts } from "@/actions/products";
+import { getInventoryRuntimeSettings } from "@/actions/settings";
 import type { Product } from "@/stores/useProductsStore";
 
 interface Movement {
@@ -20,110 +21,169 @@ interface Movement {
   unit: string;
   supplier?: string | null;
   note?: string | null;
+  product?: { id: string; name: string; emoji: string } | null;
 }
 
-interface StockSummary {
+interface InventoryItemRow {
+  productId: string;
   productName: string;
+  emoji: string;
+  quantity: number;
   unit: string;
-  totalIn: number;
-  totalOut: number;
-  net: number;
 }
+
+type InventoryResponse = {
+  product: { id: string; name: string; emoji: string };
+  quantity: number;
+  unit: string;
+}[];
 
 export default function InventoryContent() {
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [inventory, setInventory] = useState<InventoryItemRow[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [entryError, setEntryError] = useState<string | null>(null);
+  const [stockAlertThreshold, setStockAlertThreshold] = useState(10);
   const [search, setSearch] = useState("");
   const [showEntryModal, setShowEntryModal] = useState(false);
+  const [movementType, setMovementType] = useState<"entry" | "exit">("entry");
   const [activeTab, setActiveTab] = useState<"stock" | "history">("stock");
 
   const [newEntry, setNewEntry] = useState({
+    productId: "",
     productName: "",
     unit: "kg",
     quantity: "",
     supplier: "",
+    batch: "",
+    origin: "",
     note: "",
   });
 
   useEffect(() => {
-    Promise.all([getStockMovements(), getProducts()]).then(([mvs, prods]) => {
-      setMovements(mvs as Movement[]);
-      setProducts(prods as Product[]);
-      setLoading(false);
-    });
+    Promise.all([getStockMovements(), getInventory(), getProducts(), getInventoryRuntimeSettings()]).then(
+      ([mvs, inv, prods, settings]) => {
+        setMovements(mvs as Movement[]);
+        setInventory(
+          (inv as InventoryResponse).map((item) => ({
+            productId: item.product.id,
+            productName: item.product.name,
+            emoji: item.product.emoji,
+            quantity: item.quantity,
+            unit: item.unit,
+          }))
+        );
+        setProducts(prods as Product[]);
+        setStockAlertThreshold(settings?.stockAlertThreshold ?? 10);
+        setLoading(false);
+      }
+    );
   }, []);
 
-  // Per-product net stock from movements
-  const stockSummary = useMemo<StockSummary[]>(() => {
-    const map = new Map<string, StockSummary>();
-    movements.forEach((m) => {
-      if (!map.has(m.productName)) {
-        map.set(m.productName, { productName: m.productName, unit: m.unit, totalIn: 0, totalOut: 0, net: 0 });
-      }
-      const s = map.get(m.productName)!;
-      if (m.type === "entry") { s.totalIn += m.quantity; s.net += m.quantity; }
-      else if (m.type === "exit") { s.totalOut += m.quantity; s.net -= m.quantity; }
-    });
-    return Array.from(map.values()).sort((a, b) => b.net - a.net);
-  }, [movements]);
-
-  const filteredSummary = useMemo(
-    () => stockSummary.filter((s) => s.productName.toLowerCase().includes(search.toLowerCase())),
-    [stockSummary, search]
+  const filteredInventory = useMemo(
+    () => inventory.filter((item) => item.productName.toLowerCase().includes(search.toLowerCase())),
+    [inventory, search]
   );
 
   const currentMonthIn = useMemo(() => {
     const now = new Date();
     return movements
-      .filter((m) => m.type === "entry" && new Date(m.date).getMonth() === now.getMonth() && new Date(m.date).getFullYear() === now.getFullYear())
-      .reduce((acc, m) => acc + m.quantity, 0);
+      .filter((movement) => movement.type === "entry" && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
+      .reduce((acc, movement) => acc + movement.quantity, 0);
   }, [movements]);
+
+  const currentMonthOut = useMemo(() => {
+    const now = new Date();
+    return movements
+      .filter((movement) => movement.type === "exit" && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
+      .reduce((acc, movement) => acc + movement.quantity, 0);
+  }, [movements]);
+
+  const lowStockCount = useMemo(
+    () => inventory.filter((item) => item.quantity > 0 && item.quantity <= stockAlertThreshold).length,
+    [inventory, stockAlertThreshold]
+  );
+
+  async function refreshInventory() {
+    const refreshed = await getInventory();
+    setInventory(
+      (refreshed as InventoryResponse).map((item) => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        emoji: item.product.emoji,
+        quantity: item.quantity,
+        unit: item.unit,
+      }))
+    );
+  }
 
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
     const qty = parseFloat(newEntry.quantity);
-    if (!newEntry.productName || isNaN(qty) || qty <= 0) return;
+    if (!newEntry.productName || Number.isNaN(qty) || qty <= 0) return;
     setSaving(true);
     setEntryError(null);
     try {
       const created = await addStockMovement({
-        type: "entry",
+        type: movementType,
+        productId: newEntry.productId || undefined,
         productName: newEntry.productName,
         quantity: qty,
         unit: newEntry.unit,
         supplier: newEntry.supplier || undefined,
+        batch: newEntry.batch || undefined,
+        origin: newEntry.origin || undefined,
         note: newEntry.note || undefined,
       });
       setMovements((prev) => [created as Movement, ...prev]);
+      await refreshInventory();
       setShowEntryModal(false);
-      setNewEntry({ productName: "", unit: "kg", quantity: "", supplier: "", note: "" });
-    } catch {
-      setEntryError("Error al registrar el ingreso. Intentá de nuevo.");
+      setMovementType("entry");
+      setNewEntry({ productId: "", productName: "", unit: "kg", quantity: "", supplier: "", batch: "", origin: "", note: "" });
+    } catch (error) {
+      setEntryError(
+        error instanceof Error
+          ? error.message
+          : `Error al registrar la ${movementType === "entry" ? "entrada" : "salida"}. Intenta de nuevo.`
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, color: "var(--text-muted)" }}>
-      <Loader2 size={24} className="animate-spin" /> Cargando inventario...
-    </div>
-  );
+  const openMovementModal = (type: "entry" | "exit") => {
+    setMovementType(type);
+    setEntryError(null);
+    setShowEntryModal(true);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, color: "var(--text-muted)" }}>
+        <Loader2 size={24} className="animate-spin" /> Cargando inventario...
+      </div>
+    );
+  }
 
   return (
     <div className="inventory-container">
       <div className="inventory-header">
         <div className="inventory-title">
-          <h1>Gestión de Inventario</h1>
-          <p>Control de stock y entrada de mercadería</p>
+          <h1>Gestion de Inventario</h1>
+          <p>Control de stock, ingresos y salidas de mercaderia</p>
         </div>
-        <button className="btn btn--primary" onClick={() => setShowEntryModal(true)}>
-          <Plus size={18} />
-          Registrar Entrada
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn btn--secondary" onClick={() => openMovementModal("exit")}>
+            <ArrowUpRight size={18} />
+            Registrar Salida
+          </button>
+          <button className="btn btn--primary" onClick={() => openMovementModal("entry")}>
+            <Plus size={18} />
+            Registrar Entrada
+          </button>
+        </div>
       </div>
 
       <div className="inventory-stats">
@@ -137,8 +197,8 @@ export default function InventoryContent() {
         <div className="stat-card">
           <div className="stat-card__icon stat-card__icon--orange"><AlertTriangle size={20} /></div>
           <div className="stat-card__content">
-            <span className="stat-card__label">Con Stock Negativo</span>
-            <span className="stat-card__value">{stockSummary.filter((s) => s.net < 0).length}</span>
+            <span className="stat-card__label">Stock Bajo</span>
+            <span className="stat-card__value">{lowStockCount}</span>
           </div>
         </div>
         <div className="stat-card">
@@ -146,6 +206,13 @@ export default function InventoryContent() {
           <div className="stat-card__content">
             <span className="stat-card__label">Ingresos del Mes</span>
             <span className="stat-card__value">{formatNumber(Math.round(currentMonthIn * 10) / 10)} kg/un</span>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-card__icon" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444" }}><ArrowUpRight size={20} /></div>
+          <div className="stat-card__content">
+            <span className="stat-card__label">Salidas del Mes</span>
+            <span className="stat-card__value">{formatNumber(Math.round(currentMonthOut * 10) / 10)} kg/un</span>
           </div>
         </div>
       </div>
@@ -174,11 +241,11 @@ export default function InventoryContent() {
             </div>
           </div>
 
-          {filteredSummary.length === 0 ? (
+          {filteredInventory.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>
               <Package size={40} style={{ margin: "0 auto 12px", display: "block", opacity: 0.4 }} />
-              <p>Sin movimientos registrados todavía.</p>
-              <p style={{ fontSize: "0.85rem", marginTop: 8 }}>Registrá una entrada para empezar a trackear el stock.</p>
+              <p>Sin stock registrado todavia.</p>
+              <p style={{ fontSize: "0.85rem", marginTop: 8 }}>Registra una entrada para empezar a trackear el stock.</p>
             </div>
           ) : (
             <div className="inventory-table-container">
@@ -186,36 +253,29 @@ export default function InventoryContent() {
                 <thead>
                   <tr>
                     <th>Producto</th>
-                    <th>Entradas</th>
-                    <th>Salidas</th>
-                    <th>Stock Neto</th>
+                    <th>Stock Actual</th>
+                    <th>Unidad</th>
                     <th>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSummary.map((item) => (
-                    <tr key={item.productName}>
+                  {filteredInventory.map((item) => (
+                    <tr key={item.productId}>
                       <td>
                         <div className="table-product">
-                          <div className="table-product__emoji">🥩</div>
+                          <div className="table-product__emoji">{item.emoji}</div>
                           <div className="table-product__info">
                             <span className="table-product__name">{item.productName}</span>
-                            <span className="table-product__cat">{item.unit}</span>
                           </div>
                         </div>
                       </td>
-                      <td style={{ color: "var(--success)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                        +{formatNumber(item.totalIn)} {item.unit}
+                      <td style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: item.quantity <= 0 ? "var(--danger)" : item.quantity <= stockAlertThreshold ? "#f59e0b" : "var(--success)" }}>
+                        {formatNumber(item.quantity)} {item.unit}
                       </td>
-                      <td style={{ color: "var(--danger)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                        -{formatNumber(item.totalOut)} {item.unit}
-                      </td>
-                      <td style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>
-                        {formatNumber(item.net)} {item.unit}
-                      </td>
+                      <td>{item.unit}</td>
                       <td>
-                        <span className={`status-badge status-badge--${item.net <= 0 ? "danger" : item.net < 10 ? "warning" : "success"}`}>
-                          {item.net <= 0 ? "Sin Stock" : item.net < 10 ? "Bajo" : "Normal"}
+                        <span className={`status-badge status-badge--${item.quantity <= 0 ? "danger" : item.quantity <= stockAlertThreshold ? "warning" : "success"}`}>
+                          {item.quantity <= 0 ? "Sin Stock" : item.quantity <= stockAlertThreshold ? "Bajo" : "Normal"}
                         </span>
                       </td>
                     </tr>
@@ -234,29 +294,37 @@ export default function InventoryContent() {
             </div>
           ) : (
             <div className="movement-list">
-              {movements.map((m) => (
-                <div key={m.id} className="movement-card">
-                  <div className={`movement-icon movement-icon--${m.type}`}>
-                    {m.type === "entry" ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+              {movements.map((movement) => (
+                <div key={movement.id} className="movement-card">
+                  <div className={`movement-icon movement-icon--${movement.type}`}>
+                    {movement.type === "entry" ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                   </div>
                   <div className="movement-details">
                     <div className="movement-row">
-                      <span className="movement-product">{m.productName}</span>
-                      <span className={`movement-qty movement-qty--${m.type}`}>
-                        {m.type === "entry" ? "+" : "-"}{m.quantity} {m.unit}
+                      <span className="movement-product">
+                        {movement.product?.emoji ?? "📦"} {movement.productName}
+                      </span>
+                      <span className={`movement-qty movement-qty--${movement.type}`}>
+                        {movement.type === "entry" ? "+" : "-"}{movement.quantity} {movement.unit}
                       </span>
                     </div>
                     <div className="movement-row">
                       <span className="movement-meta">
-                        <Calendar size={12} /> {new Date(m.date).toLocaleString("es-AR")}
+                        <Calendar size={12} /> {new Date(movement.date).toLocaleString("es-AR")}
                       </span>
-                      {m.supplier && (
+                      {movement.supplier && (
                         <span className="movement-meta">
-                          <Truck size={12} /> {m.supplier}
+                          <Truck size={12} /> {movement.supplier}
                         </span>
                       )}
+                      {(movement as any).batch && (
+                        <span className="movement-meta">Lote: {(movement as any).batch}</span>
+                      )}
+                      {(movement as any).origin && (
+                        <span className="movement-meta">Origen: {(movement as any).origin}</span>
+                      )}
                     </div>
-                    {m.note && <p className="movement-note">{m.note}</p>}
+                    {movement.note && <p className="movement-note">{movement.note}</p>}
                   </div>
                 </div>
               ))}
@@ -269,7 +337,9 @@ export default function InventoryContent() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal__header">
-              <h3 className="modal__title">Registrar Entrada de Mercadería</h3>
+              <h3 className="modal__title">
+                {movementType === "entry" ? "Registrar Entrada de Mercaderia" : "Registrar Salida / Merma"}
+              </h3>
               <button className="modal__close" onClick={() => setShowEntryModal(false)}>
                 <X size={20} />
               </button>
@@ -281,15 +351,17 @@ export default function InventoryContent() {
                   <select
                     className="form-input"
                     required
-                    value={newEntry.productName}
+                    value={newEntry.productId}
                     onChange={(e) => {
-                      const prod = products.find((p) => p.name === e.target.value);
-                      setNewEntry({ ...newEntry, productName: e.target.value, unit: prod?.unit ?? "kg" });
+                      const product = products.find((p) => p.id === e.target.value);
+                      if (product) {
+                        setNewEntry({ ...newEntry, productId: product.id, productName: product.name, unit: product.unit });
+                      }
                     }}
                   >
                     <option value="">Seleccionar producto...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.name}>{p.emoji} {p.name} ({p.unit})</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>{product.emoji} {product.name} ({product.unit})</option>
                     ))}
                   </select>
                   <ChevronDown className="select-icon" size={18} />
@@ -310,22 +382,37 @@ export default function InventoryContent() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Proveedor</label>
+                  <label className="form-label">{movementType === "entry" ? "Proveedor" : "Motivo"}</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Nombre del proveedor"
+                    placeholder={movementType === "entry" ? "Nombre del proveedor" : "Ej: merma, vencimiento, ajuste"}
                     value={newEntry.supplier}
                     onChange={(e) => setNewEntry({ ...newEntry, supplier: e.target.value })}
                   />
                 </div>
               </div>
 
+              {movementType === "entry" && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Lote</label>
+                    <input type="text" className="form-input" placeholder="Ej: L-2025-001"
+                      value={newEntry.batch} onChange={(e) => setNewEntry({ ...newEntry, batch: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Origen</label>
+                    <input type="text" className="form-input" placeholder="Ej: Argentina, Brasil"
+                      value={newEntry.origin} onChange={(e) => setNewEntry({ ...newEntry, origin: e.target.value })} />
+                  </div>
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Observaciones</label>
                 <textarea
                   className="form-input form-textarea"
-                  placeholder="Ej: Ingreso de media res..."
+                  placeholder={movementType === "entry" ? "Ej: ingreso de media res..." : "Ej: recorte, hueso, producto vencido..."}
                   value={newEntry.note}
                   onChange={(e) => setNewEntry({ ...newEntry, note: e.target.value })}
                 />
@@ -336,12 +423,13 @@ export default function InventoryContent() {
                   {entryError}
                 </div>
               )}
+
               <div className="modal-actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setShowEntryModal(false)}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn--primary" disabled={saving}>
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : "Confirmar Ingreso"}
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : movementType === "entry" ? "Confirmar Ingreso" : "Confirmar Salida"}
                 </button>
               </div>
             </form>
@@ -354,7 +442,7 @@ export default function InventoryContent() {
         .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
         .inventory-title h1 { font-family: var(--font-heading); font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
         .inventory-title p { color: var(--text-tertiary); font-size: 0.95rem; }
-        .inventory-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 32px; }
+        .inventory-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px; }
         .stat-card { background: var(--bg-card); border: 1px solid var(--border-light); padding: 24px; border-radius: var(--radius-lg); display: flex; align-items: center; gap: 20px; }
         .stat-card__icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
         .stat-card__icon--blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
@@ -378,7 +466,6 @@ export default function InventoryContent() {
         .table-product { display: flex; align-items: center; gap: 16px; }
         .table-product__emoji { width: 40px; height: 40px; background: var(--bg-secondary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
         .table-product__name { display: block; font-weight: 700; color: var(--text-primary); }
-        .table-product__cat { font-size: 0.75rem; color: var(--text-tertiary); }
         .movement-list { display: flex; flex-direction: column; gap: 12px; }
         .movement-card { background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: var(--radius-md); display: flex; gap: 20px; align-items: center; }
         .movement-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export interface CartItem {
   id: string | number;
+  productId: string;
   name: string;
   price: number;
   quantity: number; // For weighted items, this is kg

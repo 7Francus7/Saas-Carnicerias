@@ -1,7 +1,10 @@
+import { requirePageAccess } from "@/lib/permissions";
 import Sidebar from "@/components/layout/Sidebar";
 import ConfigContent from "@/components/config/ConfigContent";
 
-export default function ConfigPage() {
+export default async function ConfigPage() {
+  await requirePageAccess("config");
+
   return (
     <div className="app-layout">
       <Sidebar />

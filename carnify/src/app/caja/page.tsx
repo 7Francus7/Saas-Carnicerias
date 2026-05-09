@@ -1,7 +1,10 @@
+import { requirePageAccess } from "@/lib/permissions";
 import Sidebar from "@/components/layout/Sidebar";
 import CajaContent from "@/components/caja/CajaContent";
 
-export default function CajaPage() {
+export default async function CajaPage() {
+  await requirePageAccess("caja");
+
   return (
     <div className="app-layout">
       <Sidebar />

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenant } from "./_helpers";
+import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -17,7 +17,7 @@ const ClientSchema = z.object({
 });
 
 export async function getClients() {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   return prisma.client.findMany({
     where: { organizationId: tenantId },
     include: { movements: { orderBy: { date: "desc" } }, periods: { orderBy: { closedAt: "desc" } } },
@@ -25,8 +25,29 @@ export async function getClients() {
   });
 }
 
+export async function getClientsForPos() {
+  const { tenantId } = await requireTenantAndSection("pos");
+  return prisma.client.findMany({
+    where: { organizationId: tenantId },
+    select: {
+      id: true,
+      name: true,
+      dni: true,
+      phone: true,
+      address: true,
+      email: true,
+      notes: true,
+      creditLimit: true,
+      balance: true,
+      status: true,
+      createdAt: true,
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function createClient(data: z.infer<typeof ClientSchema>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   const parsed = ClientSchema.parse(data);
   const client = await prisma.client.create({
     data: { ...parsed, organizationId: tenantId },
@@ -37,13 +58,13 @@ export async function createClient(data: z.infer<typeof ClientSchema>) {
 }
 
 export async function updateClient(id: string, data: Partial<z.infer<typeof ClientSchema>>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   await prisma.client.updateMany({ where: { id, organizationId: tenantId }, data });
   revalidatePath("/clientes");
 }
 
 export async function deleteClient(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   await prisma.client.deleteMany({ where: { id, organizationId: tenantId } });
   revalidatePath("/clientes");
 }
@@ -54,7 +75,7 @@ export async function addPayment(
   note: string,
   method: string,
 ) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId: tenantId },
   });
@@ -62,33 +83,34 @@ export async function addPayment(
 
   const newBalance = Math.max(0, client.balance - amount);
 
-  const movement = await prisma.clientMovement.create({
-    data: {
-      clientId,
-      date: new Date(),
-      type: "payment",
-      amount,
-      balanceAfter: newBalance,
-      description: note || "Pago",
-      paymentMethod: method,
-    },
-  });
-
-  await prisma.client.update({
-    where: { id: clientId },
-    data: {
-      balance: newBalance,
-      status: newBalance === 0 ? "active" : client.status,
-      lastActivity: new Date(),
-    },
-  });
+  const [movement] = await prisma.$transaction([
+    prisma.clientMovement.create({
+      data: {
+        clientId,
+        date: new Date(),
+        type: "payment",
+        amount,
+        balanceAfter: newBalance,
+        description: note || "Pago",
+        paymentMethod: method,
+      },
+    }),
+    prisma.client.update({
+      where: { id: clientId },
+      data: {
+        balance: newBalance,
+        status: newBalance === 0 ? "active" : client.status,
+        lastActivity: new Date(),
+      },
+    }),
+  ]);
 
   revalidatePath("/clientes");
   return movement;
 }
 
 export async function addSaleToAccount(clientId: string, amount: number, description: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId: tenantId },
   });
@@ -96,31 +118,32 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
 
   const newBalance = client.balance + amount;
 
-  await prisma.clientMovement.create({
-    data: {
-      clientId,
-      date: new Date(),
-      type: "sale",
-      amount,
-      balanceAfter: newBalance,
-      description,
-    },
-  });
-
-  await prisma.client.update({
-    where: { id: clientId },
-    data: {
-      balance: newBalance,
-      status: newBalance > client.creditLimit ? "overdue" : "active",
-      lastActivity: new Date(),
-    },
-  });
+  await prisma.$transaction([
+    prisma.clientMovement.create({
+      data: {
+        clientId,
+        date: new Date(),
+        type: "sale",
+        amount,
+        balanceAfter: newBalance,
+        description,
+      },
+    }),
+    prisma.client.update({
+      where: { id: clientId },
+      data: {
+        balance: newBalance,
+        status: newBalance > client.creditLimit ? "overdue" : "active",
+        lastActivity: new Date(),
+      },
+    }),
+  ]);
 
   revalidatePath("/clientes");
 }
 
 export async function closePeriod(clientId: string, reason: "settled" | "month_end" | "manual") {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("clientes");
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId: tenantId },
     include: { movements: { where: { periodId: null } } },

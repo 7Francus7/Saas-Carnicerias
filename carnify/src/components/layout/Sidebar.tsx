@@ -28,6 +28,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
   UserCog,
   Wallet,
   BarChart3,
+  Settings,
 };
 
 export default function Sidebar() {
@@ -221,15 +222,6 @@ export default function Sidebar() {
             </span>
             <span>{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
           </button>
-
-          {permissions === "all" && !viewingAs && (
-            <Link href="/config" className="sidebar__link" style={{ marginBottom: 4 }} onClick={closeMobile}>
-              <span className="sidebar__link-icon-wrap">
-                <Settings size={16} />
-              </span>
-              <span>Configuracion</span>
-            </Link>
-          )}
 
           <div className="sidebar__user">
             <div className="sidebar__user-avatar">{iniciales}</div>

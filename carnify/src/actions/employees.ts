@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { getUserPermissions } from "@/lib/permissions";
 import type { SectionKey } from "@/lib/sections";
 
 async function getSessionOrThrow() {
@@ -31,27 +32,10 @@ async function requireOwnerOrAdmin() {
 // ─── Queries ───────────────────────────────────────────────────────────────
 
 export async function getMyPermissions(): Promise<SectionKey[] | "all"> {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) return [];
-    const tenantId = session.session.activeOrganizationId;
-    if (!tenantId) return [];
-
-    const member = await prisma.member.findFirst({
-      where: { userId: session.user.id, organizationId: tenantId },
-    });
-
-    if (!member) return [];
-    if (member.role === "owner" || member.role === "admin") return "all";
-
-    const perms = await prisma.employeePermissions.findUnique({
-      where: { memberId: member.id },
-    });
-
-    return (perms?.sections ?? []) as SectionKey[];
-  } catch {
-    return "all";
-  }
+  const perms = await getUserPermissions();
+  if (!perms) return [];
+  if (perms.sections === "all") return "all";
+  return perms.sections;
 }
 
 export async function getOrgMembers() {
@@ -119,26 +103,29 @@ export async function createEmployee(data: {
   if (!result?.user?.id) throw new Error("No se pudo crear el usuario");
 
   const memberId = crypto.randomUUID();
-  await prisma.member.create({
-    data: {
-      id: memberId,
-      userId: result.user.id,
-      organizationId: tenantId,
-      role: "cashier",
-      createdAt: new Date(),
-      dni: data.dni ?? null,
-      phone: data.phone ?? null,
-      address: data.address ?? null,
-      position: data.position ?? null,
-      salary: data.salary ?? null,
-      schedule: data.schedule ?? null,
-      status: data.status ?? null,
-      notes: data.notes ?? null,
-    },
-  });
 
-  await prisma.employeePermissions.create({
-    data: { memberId, organizationId: tenantId, sections: data.sections },
+  await prisma.$transaction(async (tx) => {
+    await tx.member.create({
+      data: {
+        id: memberId,
+        userId: result.user.id,
+        organizationId: tenantId,
+        role: "cashier",
+        createdAt: new Date(),
+        dni: data.dni ?? null,
+        phone: data.phone ?? null,
+        address: data.address ?? null,
+        position: data.position ?? null,
+        salary: data.salary ?? null,
+        schedule: data.schedule ?? null,
+        status: data.status ?? null,
+        notes: data.notes ?? null,
+      },
+    });
+
+    await tx.employeePermissions.create({
+      data: { memberId, organizationId: tenantId, sections: data.sections },
+    });
   });
 
   revalidatePath("/empleados");

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Wallet, ArrowDownCircle, ArrowUpCircle, Lock, Unlock,
   X, DollarSign, CreditCard, Smartphone, UserPlus,
-  Calculator, QrCode, TrendingUp, Receipt, Users,
+  Calculator, QrCode, TrendingUp,
   Clock, AlertTriangle, Check, History, Loader2,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
@@ -25,13 +25,6 @@ const METHODS = [
   { key: "fiado",    label: "Cuenta Corriente", Icon: UserPlus,    color: "var(--danger)",  bg: "var(--danger-soft)" },
 ] as const;
 
-function methodLabel(key: string) {
-  return METHODS.find((m) => m.key === key)?.label ?? key;
-}
-function methodColor(key: string) {
-  return METHODS.find((m) => m.key === key)?.color ?? "var(--text-secondary)";
-}
-
 const TZ = "America/Argentina/Buenos_Aires";
 
 function fmtTime(iso: string) {
@@ -44,16 +37,6 @@ function fmtDate(iso: string) {
 // ── History row ───────────────────────────────────────────────────────────────
 function HistoryRow({ s }: { s: import("@/stores/useCajaStore").CajaSession }) {
   const sTotal    = s.ventas.reduce((a, v) => a + v.total, 0);
-  const cashSales = s.ventas.reduce((acc, v) => {
-    if (v.splits) {
-      const split = v.splits.find(sp => sp.method === 'cash');
-      return acc + (split ? split.amount : 0);
-    }
-    return acc + (v.method === 'cash' ? v.total : 0);
-  }, 0);
-  const sIn  = s.transactions.filter((t) => t.type === "in").reduce((a, t) => a + t.amount, 0);
-  const sOut = s.transactions.filter((t) => t.type === "out").reduce((a, t) => a + t.amount, 0);
-  const sTeorico = s.startingCash + cashSales + sIn - sOut;
 
   const hasDiff = s.diffAmount !== undefined;
   const diffCls = !hasDiff ? "" :
@@ -88,10 +71,14 @@ function HistoryRow({ s }: { s: import("@/stores/useCajaStore").CajaSession }) {
 export default function CajaContent() {
   const { currentSession, history, hydrate } = useCajaStore();
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [openingCaja, setOpeningCaja] = useState(false);
+  const [submittingMove, setSubmittingMove] = useState(false);
+  const [closingCaja, setClosingCaja] = useState(false);
 
   const isOpen       = currentSession !== null;
-  const ventas       = currentSession?.ventas       ?? [];
-  const transactions = currentSession?.transactions ?? [];
+  const ventas = useMemo(() => currentSession?.ventas ?? [], [currentSession]);
+  const transactions = useMemo(() => currentSession?.transactions ?? [], [currentSession]);
   const startingCash = currentSession?.startingCash ?? 0;
   const openedAt     = currentSession?.openedAt;
 
@@ -107,7 +94,7 @@ export default function CajaContent() {
     setLoading(false);
   }, [hydrate]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
   // Derived
   const salesByMethod = useMemo(() => {
@@ -125,8 +112,14 @@ export default function CajaContent() {
   }, [ventas]);
 
   const totalSales = useMemo(() => ventas.reduce((s, v) => s + v.total, 0), [ventas]);
-  const totalIn    = useMemo(() => transactions.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [transactions]);
-  const totalOut   = useMemo(() => transactions.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0), [transactions]);
+  const totalIn = useMemo(
+    () => transactions.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0),
+    [transactions]
+  );
+  const totalOut = useMemo(
+    () => transactions.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0),
+    [transactions]
+  );
   const efectivoTeorico = startingCash + (salesByMethod.cash ?? 0) + totalIn - totalOut;
   const txCount  = ventas.length;
   const avgTicket = txCount > 0 ? Math.round(totalSales / txCount) : 0;
@@ -146,61 +139,121 @@ export default function CajaContent() {
   const realVal       = parseFloat(arqueoReal.replace(",", ".")) || 0;
   const diff          = arqueoReal !== "" ? realVal - efectivoTeorico : null;
 
-  const tericoByMethod: Record<string, number> = {
-    cash:     efectivoTeorico,
+  const tericoByMethod = useMemo<Record<string, number>>(() => ({
+    cash: efectivoTeorico,
     transfer: salesByMethod.transfer ?? 0,
-    card:     salesByMethod.card     ?? 0,
-    link:     salesByMethod.link     ?? 0,
-  };
+    card: salesByMethod.card ?? 0,
+    link: salesByMethod.link ?? 0,
+  }), [efectivoTeorico, salesByMethod.card, salesByMethod.link, salesByMethod.transfer]);
 
-  const diffByMethod: Record<string, number | null> = {};
-  let totalCloseDiff = 0;
-  let totalCloseEntered = 0;
-  ["cash", "transfer", "card", "link"].forEach((key) => {
-    const raw = closeAmounts[key];
-    if (raw !== undefined && raw !== "") {
-      const real = parseFloat(raw.replace(",", ".")) || 0;
-      const d = real - (tericoByMethod[key] ?? 0);
-      diffByMethod[key] = d;
-      totalCloseDiff += d;
-      totalCloseEntered++;
-    } else {
-      diffByMethod[key] = null;
-    }
-  });
+  const closeReview = useMemo(() => {
+    const diffByMethod: Record<string, number | null> = {};
+    let totalCloseDiff = 0;
+    let totalCloseEntered = 0;
+
+    ["cash", "transfer", "card", "link"].forEach((key) => {
+      const raw = closeAmounts[key];
+      if (raw !== undefined && raw !== "") {
+        const real = parseFloat(raw.replace(",", ".")) || 0;
+        const d = real - (tericoByMethod[key] ?? 0);
+        diffByMethod[key] = d;
+        totalCloseDiff += d;
+        totalCloseEntered++;
+      } else {
+        diffByMethod[key] = null;
+      }
+    });
+
+    return { diffByMethod, totalCloseDiff, totalCloseEntered };
+  }, [closeAmounts, tericoByMethod]);
+
+  const { diffByMethod, totalCloseDiff, totalCloseEntered } = closeReview;
 
   async function handleOpenCaja() {
     const amount = parseFloat(openAmount.replace(",", "."));
-    if (isNaN(amount) || amount < 0) return;
-    await dbOpenCaja(amount);
-    await loadData();
+    if (isNaN(amount) || amount < 0) {
+      setActionError("Ingresa un fondo inicial valido para abrir la caja.");
+      return;
+    }
+    setActionError(null);
+    setOpeningCaja(true);
+    try {
+      await dbOpenCaja(amount);
+      await loadData();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "No se pudo abrir la caja.");
+    } finally {
+      setOpeningCaja(false);
+    }
   }
 
   function openMove(type: "in" | "out") {
+    setActionError(null);
     setMoveType(type); setMoveAmount(""); setMoveReason(""); setMoveDone(false);
     setShowMove(true);
+  }
+
+  function openCloseModal() {
+    setActionError(null);
+    setArqueoReal("");
+    setCloseAmounts({
+      cash: "",
+      transfer: tericoByMethod.transfer > 0 ? String(tericoByMethod.transfer) : "",
+      card: tericoByMethod.card > 0 ? String(tericoByMethod.card) : "",
+      link: tericoByMethod.link > 0 ? String(tericoByMethod.link) : "",
+    });
+    setShowClose(true);
   }
 
   async function handleMovement(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(moveAmount);
-    if (isNaN(amount) || amount <= 0) return;
-    await addCashTransaction(moveType, amount, moveReason);
-    setMoveDone(true);
-    await loadData();
-    setTimeout(() => { setShowMove(false); setMoveDone(false); setMoveAmount(""); setMoveReason(""); }, 1200);
+    if (isNaN(amount) || amount <= 0) {
+      setActionError("Ingresa un monto valido para registrar el movimiento.");
+      return;
+    }
+    setActionError(null);
+    setSubmittingMove(true);
+    try {
+      await addCashTransaction(moveType, amount, moveReason);
+      setMoveDone(true);
+      await loadData();
+      setTimeout(() => {
+        setShowMove(false);
+        setMoveDone(false);
+        setMoveAmount("");
+        setMoveReason("");
+      }, 1200);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "No se pudo registrar el movimiento.");
+    } finally {
+      setSubmittingMove(false);
+    }
   }
 
   async function handleCloseCaja() {
+    if (!closeAmounts.cash || closeAmounts.cash.trim() === "") {
+      setActionError("Ingresa el efectivo contado antes de cerrar la caja.");
+      return;
+    }
     const amounts: Record<string, number> = {};
     Object.entries(closeAmounts).forEach(([key, val]) => {
       const n = parseFloat(val.replace(",", "."));
       if (!isNaN(n)) amounts[key] = n;
     });
-    await dbCloseCaja(amounts);
-    await loadData();
-    setShowClose(false);
-    setCloseAmounts({});
+    setActionError(null);
+    setClosingCaja(true);
+    try {
+      await dbCloseCaja(amounts);
+      await loadData();
+      setShowClose(false);
+      setCloseAmounts({});
+      setArqueoReal("");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "No se pudo cerrar la caja.");
+    } finally {
+      setClosingCaja(false);
+    }
   }
 
   if (loading) {
@@ -259,9 +312,16 @@ export default function CajaContent() {
               className="btn btn--primary"
               style={{ width: "100%", maxWidth: 300, justifyContent: "center" }}
               onClick={handleOpenCaja}
+              disabled={openingCaja}
             >
-              <Unlock size={16} /> Abrir Caja
+              {openingCaja ? <Loader2 size={16} className="animate-spin" /> : <Unlock size={16} />} Abrir Caja
             </button>
+
+            {actionError && (
+              <div className="arqueo-diff arqueo-diff--under" style={{ width: "100%", maxWidth: 300, marginTop: 14 }}>
+                <span>{actionError}</span>
+              </div>
+            )}
           </div>
 
           {history.length > 0 && (
@@ -311,7 +371,7 @@ export default function CajaContent() {
           <button className="btn btn--secondary btn--sm" onClick={() => openMove("in")}>
             <ArrowDownCircle size={15} /> Ingresar
           </button>
-          <button className="btn btn--danger" onClick={() => { setArqueoReal(""); setShowClose(true); }}>
+          <button className="btn btn--danger" onClick={openCloseModal}>
             <Lock size={15} /> Cerrar Caja
           </button>
         </div>
@@ -319,7 +379,7 @@ export default function CajaContent() {
 
       {/* Stats */}
       <div className="stats-grid">
-        <div className="stat-card stat-card--revenue animate-in animate-in-delay-1" style={{ gridColumn: "span 4" }}>
+          <div className="stat-card stat-card--revenue animate-in animate-in-delay-1" style={{ gridColumn: "span 4" }}>
           <div className="stat-card__top">
             <div className="stat-card__icon stat-card__icon--revenue"><Wallet size={24} /></div>
             <div style={{ display: "flex", gap: 12 }}>
@@ -329,7 +389,7 @@ export default function CajaContent() {
             </div>
           </div>
           <div className="stat-card__value" style={{ fontSize: "2.5rem" }}>{formatCurrency(efectivoTeorico)}</div>
-          <div className="stat-card__label">Efectivo Total en Caja</div>
+          <div className="stat-card__label">Efectivo Total en Caja · {txCount} ventas · Ticket promedio {formatCurrency(avgTicket)}</div>
         </div>
       </div>
 
@@ -464,7 +524,7 @@ export default function CajaContent() {
             <button
               className="btn btn--danger btn--full"
               style={{ justifyContent: "center" }}
-              onClick={() => setShowClose(true)}
+              onClick={openCloseModal}
             >
               <Lock size={16} /> Cerrar Caja
             </button>
@@ -536,9 +596,16 @@ export default function CajaContent() {
                 </div>
               )}
 
+              {actionError && (
+                <div className="arqueo-diff arqueo-diff--under" style={{ marginBottom: 14 }}>
+                  <span>{actionError}</span>
+                </div>
+              )}
+
               <div className="modal-actions">
                 <button type="button" className="btn btn--ghost" onClick={() => setShowMove(false)}>Cancelar</button>
-                <button type="submit" className={`btn btn--${moveType === "in" ? "success" : "danger"} btn--full`}>
+                <button type="submit" className={`btn btn--${moveType === "in" ? "success" : "danger"} btn--full`} disabled={submittingMove}>
+                  {submittingMove ? <Loader2 size={16} className="animate-spin" /> : null}
                   Confirmar {moveType === "in" ? "Ingreso" : "Retiro"}
                 </button>
               </div>
@@ -734,13 +801,20 @@ export default function CajaContent() {
                     </div>
                   )}
 
+                  {actionError && (
+                    <div className="arqueo-diff arqueo-diff--under">
+                      <span>{actionError}</span>
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
                     <button
                       className="btn btn--danger btn--full"
                       style={{ justifyContent: "center", fontWeight: 700 }}
                       onClick={handleCloseCaja}
+                      disabled={closingCaja}
                     >
-                      <Lock size={15} /> Confirmar Cierre
+                      {closingCaja ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />} Confirmar Cierre
                     </button>
                     <button
                       className="btn btn--ghost btn--full"

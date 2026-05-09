@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, ShoppingBag, Receipt, Users,
@@ -13,10 +13,11 @@ import {
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
-import { getCurrentSession } from "@/actions/caja";
+import { getCurrentSession, getDashboardStats } from "@/actions/caja";
 import { useSession } from "@/lib/auth-client";
 
 type ChartPoint = { hour: string; ventas: number };
+type WeeklyPoint = { day: string; ventas: number };
 type PaymentSlice = { method: string; amount: number; percentage: number; color: string };
 type RecentSale = {
   id: string;
@@ -27,6 +28,20 @@ type RecentSale = {
   client: string | null;
 };
 type TooltipEntry = { color?: string; name?: string; value?: number };
+
+type DashboardData = {
+  revenue: number;
+  orders: number;
+  ticket: number;
+  clients: number;
+  hasOpenCaja: boolean;
+  hourlySales: ChartPoint[];
+  weeklySales: WeeklyPoint[];
+  paymentBreakdown: PaymentSlice[];
+  recentSales: RecentSale[];
+  stockAlerts: { product: string; stock: number }[];
+  topProducts: { name: string; total: number }[];
+};
 
 function CustomTooltip({ active, payload, label }: {
   active?: boolean;
@@ -103,6 +118,58 @@ function LiveClock() {
         <div className="live-clock__date" style={{ textTransform: "capitalize" }}>
           {time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyChart({ data }: { data: WeeklyPoint[] }) {
+  const displayData = data.length > 0 ? data : 
+    [{ day: "lun", ventas: 0 }, { day: "mar", ventas: 0 }, { day: "mié", ventas: 0 },
+     { day: "jue", ventas: 0 }, { day: "vie", ventas: 0 }, { day: "sáb", ventas: 0 }, { day: "dom", ventas: 0 }];
+
+  return (
+    <div className="card animate-in animate-in-delay-3">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Ventas Semanales</div>
+          <div className="card__subtitle">Últimos 7 días</div>
+        </div>
+      </div>
+      <div className="chart-container">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id="weekGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+            <XAxis
+              dataKey="day"
+              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+              axisLine={{ stroke: "var(--border-light)" }}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Area
+              type="monotone"
+              dataKey="ventas"
+              stroke="#3B82F6"
+              strokeWidth={2.5}
+              fill="url(#weekGradient)"
+              dot={false}
+              activeDot={{ r: 5, stroke: "#3B82F6", strokeWidth: 2, fill: "var(--bg-card)" }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -317,11 +384,14 @@ function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
 export default function DashboardContent() {
   const router = useRouter();
   const { currentSession, hydrate } = useCajaStore();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   const loadSession = useCallback(async () => {
     const s = await getCurrentSession();
     if (s) hydrate(mapDbSessionToStore(s), []);
     else hydrate(null, []);
+    const stats = await getDashboardStats();
+    setDashboardData(stats as DashboardData);
   }, [hydrate]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
@@ -337,78 +407,30 @@ export default function DashboardContent() {
 
   const userName = session?.user?.name?.split(" ")[0] || "Usuario";
 
-  const realData = useMemo(() => {
-    if (!currentSession || currentSession.ventas.length === 0) {
-      return {
-        revenue: 0, orders: 0, ticket: 0, clients: 0,
-        hourlySales: [] as ChartPoint[],
-        recentSales: [] as RecentSale[],
-        paymentBreakdown: [] as PaymentSlice[],
-      };
-    }
-
-    const ventas = currentSession.ventas.reduce((acc, v) => acc + v.total, 0);
-    const orders = currentSession.ventas.length;
-    let uniqueClients = new Set(currentSession.ventas.filter(v => v.clientId).map(v => v.clientId)).size;
-    
-    // Si hubo ventas pero no registraron cliente, asumimos al menos 1 publico general
-    if (uniqueClients === 0 && orders > 0) uniqueClients = 1; 
-
-    const ticket = orders > 0 ? Math.round(ventas / orders) : 0;
-    
-    // Evolutivo por hora
-    const mapHourly: Record<string, number> = {};
-    currentSession.ventas.forEach(v => {
-        const h = new Date(v.timestamp).getHours().toString().padStart(2, '0') + ':00';
-        mapHourly[h] = (mapHourly[h] ?? 0) + v.total;
-    });
-    
-    const hourlySales = Object.entries(mapHourly)
-      .map(([hour, val]) => ({ hour, ventas: val }))
-      .sort((a,b) => a.hour.localeCompare(b.hour));
-
-    // Distribucion de medios de pago
-    const paymentMap: Record<string, number> = {};
-    currentSession.ventas.forEach(v => {
-      if (v.splits) {
-        v.splits.forEach(sp => { paymentMap[sp.method] = (paymentMap[sp.method] ?? 0) + sp.amount; });
-      } else {
-        paymentMap[v.method] = (paymentMap[v.method] ?? 0) + v.total;
-      }
-    });
-
-    const colors: Record<string, string> = {
-      "Efectivo": "#22C55E",
-      "Transferencia": "#3B82F6",
-      "Tarjeta": "#F59E0B",
-      "QR / Link": "#A855F7",
-      "Cuenta Corriente": "#EF4444"
-    };
-
-    const paymentBreakdown: PaymentSlice[] = Object.entries(paymentMap).map(([m, val]) => ({
-       method: m, amount: val, percentage: ventas > 0 ? parseFloat(((val/ventas)*100).toFixed(1)) : 0, color: colors[m] || "#888"
-    })).sort((a,b) => b.amount - a.amount);
-
-    // ultimas transacciones (top 5)
-    const recentSales: RecentSale[] = [...currentSession.ventas].reverse().map(v => ({
-       id: `TK-${v.id.substring(0,4).toUpperCase()}`,
-       time: new Date(v.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-       items: v.itemCount || 1,
-       total: v.total,
-       payment: v.method,
-       client: v.clientName || null
-    }));
-
-    return { revenue: ventas, orders, ticket, clients: uniqueClients, hourlySales, recentSales, paymentBreakdown };
-  }, [currentSession]);
-
+  const realData = dashboardData ?? {
+    revenue: 0, orders: 0, ticket: 0, clients: 0,
+    hasOpenCaja: false,
+    hourlySales: [] as ChartPoint[],
+    weeklySales: [] as WeeklyPoint[],
+    paymentBreakdown: [] as PaymentSlice[],
+    recentSales: [] as RecentSale[],
+    stockAlerts: [],
+    topProducts: [],
+  };
 
   return (
     <div className="page-container">
       {/* Header */}
       <div className="page-header animate-in">
         <div className="page-header__left">
-          <div className="page-header__greeting">{greeting()}, {userName}</div>
+          <div className="page-header__greeting">
+            {greeting()}, {userName}
+            {!realData.hasOpenCaja && realData.revenue > 0 && (
+              <span className="badge badge--warning" style={{ marginLeft: 12, fontSize: "0.7rem", verticalAlign: "middle" }}>
+                Caja cerrada
+              </span>
+            )}
+          </div>
           <h1 className="page-header__title">
             Panel de <span>Control</span>
           </h1>
@@ -421,7 +443,7 @@ export default function DashboardContent() {
         </div>
       </div>
 
-      {/* Stats - Conectados a Datos Reales */}
+      {/* Stats */}
       <div className="stats-grid">
         <StatCard stat={{ label: "Ventas del Día", value: realData.revenue, trend: 0, trendDirection: "up" }} type="revenue" delay={1} />
         <StatCard stat={{ label: "Transacciones", value: realData.orders, trend: 0, trendDirection: "up" }} type="orders" delay={2} />
@@ -429,10 +451,15 @@ export default function DashboardContent() {
         <StatCard stat={{ label: "Clientes Atendidos", value: realData.clients, trend: 0, trendDirection: "up" }} type="clients" delay={4} />
       </div>
 
-      {/* Chart + Quick Actions */}
+      {/* Left: Charts | Right: Quick Actions + Payment + Weekly */}
       <div className="dashboard-grid">
-        <SalesChart data={realData.hourlySales} />
-        <RightPanel paymentData={realData.paymentBreakdown} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <SalesChart data={realData.hourlySales} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <RightPanel paymentData={realData.paymentBreakdown} />
+          <WeeklyChart data={realData.weeklySales} />
+        </div>
       </div>
 
       {/* Recent Sales */}

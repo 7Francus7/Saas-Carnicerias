@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { requirePageAccess } from "@/lib/permissions";
 import Sidebar from "@/components/layout/Sidebar";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import MarketingLanding from "@/components/marketing/MarketingLanding";
@@ -33,6 +34,8 @@ export default async function Home() {
       redirect("/onboarding");
     }
   }
+
+  await requirePageAccess("dashboard");
 
   return (
     <div className="app-layout">

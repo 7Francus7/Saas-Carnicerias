@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenant } from "./_helpers";
+import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -12,10 +12,15 @@ const ProductSchema = z.object({
   emoji: z.string().min(1),
   price: z.number().positive(),
   unit: z.enum(["kg", "un", "lt"]),
+  baseUnit: z.enum(["kg", "un", "lt"]).optional(),
+  conversionFactor: z.number().positive().optional(),
+  productType: z.enum(["raw", "processed", "resale"]).optional(),
+  discountPercent: z.number().min(0).max(100).optional(),
+  discountEndDate: z.string().optional(),
 });
 
 export async function getProducts() {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("productos");
   return prisma.product.findMany({
     where: { organizationId: tenantId },
     include: { cost: true },
@@ -24,7 +29,7 @@ export async function getProducts() {
 }
 
 export async function createProduct(data: z.infer<typeof ProductSchema>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("productos");
   const parsed = ProductSchema.parse(data);
   const product = await prisma.product.create({
     data: { ...parsed, organizationId: tenantId },
@@ -36,7 +41,7 @@ export async function createProduct(data: z.infer<typeof ProductSchema>) {
 }
 
 export async function updateProduct(id: string, data: Partial<z.infer<typeof ProductSchema>>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("productos");
   const product = await prisma.product.updateMany({
     where: { id, organizationId: tenantId },
     data,
@@ -47,7 +52,7 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof Pro
 }
 
 export async function deleteProduct(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("productos");
   await prisma.product.deleteMany({ where: { id, organizationId: tenantId } });
   revalidatePath("/productos");
   revalidatePath("/pos");

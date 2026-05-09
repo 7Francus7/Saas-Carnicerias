@@ -1,11 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenant } from "./_helpers";
+import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 
 export async function getCostos() {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("costos");
   return prisma.productCost.findMany({
     where: { organizationId: tenantId },
     include: { product: true },
@@ -13,7 +13,7 @@ export async function getCostos() {
 }
 
 export async function upsertCosto(productId: string, cost: number) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("costos");
   // Verify product belongs to tenant
   const product = await prisma.product.findFirst({ where: { id: productId, organizationId: tenantId } });
   if (!product) throw new Error("Producto no encontrado");
@@ -27,7 +27,7 @@ export async function upsertCosto(productId: string, cost: number) {
 }
 
 export async function deleteCosto(productId: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("costos");
   await prisma.productCost.deleteMany({ where: { productId, organizationId: tenantId } });
   revalidatePath("/costos");
 }

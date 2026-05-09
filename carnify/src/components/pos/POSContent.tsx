@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  Search, ShoppingCart, Trash2, X, Wallet,
-  CreditCard, Smartphone, QrCode, UserPlus,
+  Search, ShoppingCart, Trash2, X,
   Scan, CheckCircle, AlertCircle,
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES, PAYMENT_METHODS,
-  formatCurrency,
+  formatCurrency, formatNumber,
 } from "@/lib/constants";
 import { usePOSStore } from "@/stores/usePOSStore";
 import { useProductsStore } from "@/stores/useProductsStore";
@@ -17,17 +16,52 @@ import type { ClientProfile } from "@/stores/useClientStore";
 import type { Product } from "@/stores/useProductsStore";
 import { getProducts } from "@/actions/products";
 import { getCurrentSession, recordSale as dbRecordSale } from "@/actions/caja";
-import { getClients, addSaleToAccount as dbAddSaleToAccount } from "@/actions/clients";
+import { getClientsForPos } from "@/actions/clients";
+import { getPosRuntimeSettings } from "@/actions/settings";
+import { getInventoryForPos } from "@/actions/stock";
+import { DEFAULT_POS, type PosSettings } from "@/stores/useSettingsStore";
 
 // ── Barcode parsing ─────────────────────────────────────────────────────────
 // Scale EAN-13 format: 2 [PLU 5 digits] [weight in grams 5 digits] [check digit]
+// Also supports: 21 [PLU 5 digits] [weight 5 digits] (some scales), 
+// GS1-14: 9 [PLU 5 digits] [weight 3 digits] [check], 
+// and bare PLU codes (just the number)
 function parseScaleBarcode(barcode: string): { plu: string; weightKg: number } | null {
-  if (barcode.length !== 13 || !barcode.startsWith("2")) return null;
-  if (!/^\d{13}$/.test(barcode)) return null;
-  const plu = barcode.slice(1, 6);
-  const weightGrams = parseInt(barcode.slice(6, 11), 10);
-  if (isNaN(weightGrams) || weightGrams <= 0) return null;
-  return { plu, weightKg: weightGrams / 1000 };
+  if (!/^\d+$/.test(barcode)) return null;
+  const len = barcode.length;
+
+  // EAN-13 starting with 2 (most common scale format)
+  if (len === 13 && barcode.startsWith("2")) {
+    const plu = barcode.slice(1, 6);
+    const weightGrams = parseInt(barcode.slice(6, 11), 10);
+    if (!isNaN(weightGrams) && weightGrams > 0) return { plu, weightKg: weightGrams / 1000 };
+  }
+
+  // EAN-13 starting with 21 (alternative scale format)
+  if (len === 13 && barcode.startsWith("21")) {
+    const plu = barcode.slice(2, 7);
+    const weightGrams = parseInt(barcode.slice(7, 12), 10);
+    if (!isNaN(weightGrams) && weightGrams > 0) return { plu, weightKg: weightGrams / 1000 };
+  }
+
+  // EAN-13 starting with 4 (PLU + price embedded — some scales use this)
+  if (len === 13 && (barcode.startsWith("4") || barcode.startsWith("5"))) {
+    const plu = barcode.slice(1, 6);
+    const priceCentavos = parseInt(barcode.slice(6, 12), 10);
+    if (!isNaN(priceCentavos) && priceCentavos > 0) {
+      // These encode price, not weight. Return weight=1, caller uses price override
+      return { plu, weightKg: 1 };
+    }
+  }
+
+  // 8-digit: [PLU 5 digits] [weight in grams 3 digits] (compact format)
+  if (len === 8) {
+    const plu = barcode.slice(0, 5);
+    const weightGrams = parseInt(barcode.slice(5, 8), 10);
+    if (!isNaN(weightGrams) && weightGrams > 0) return { plu, weightKg: weightGrams / 1000 };
+  }
+
+  return null;
 }
 
 // ── Scan flash types ────────────────────────────────────────────────────────
@@ -55,12 +89,35 @@ export default function POSContent() {
     else hydrate(null, []);
   }, [hydrate]);
 
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("todos");
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState<{ method: string; amount: number }[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [inventoryByProduct, setInventoryByProduct] = useState<Record<string, { quantity: number; unit: string }>>({});
+  const [businessName, setBusinessName] = useState("Carnify");
+  const [posSettings, setPosSettings] = useState<PosSettings>(DEFAULT_POS);
+  const [scanResult, setScanResult] = useState<ScanResult>(null);
+  const [weightValue, setWeightValue] = useState("");
+
+  function getEffectivePrice(p: Product): number {
+    if (p.discountPercent && p.discountPercent > 0) {
+      return p.price * (1 - p.discountPercent / 100);
+    }
+    return p.price;
+  }
+
   useEffect(() => {
     loadSession();
     if (products.length === 0) {
       getProducts().then((data) => setProducts(data as Product[]));
     }
-    getClients().then((data) =>
+    getClientsForPos().then((data) =>
       setClients(
         data.map((c) => ({
           id: c.id,
@@ -80,23 +137,52 @@ export default function POSContent() {
         }))
       )
     );
+    getPosRuntimeSettings().then((settings) => {
+      if (!settings) return;
+      setBusinessName(settings.nombre?.trim() || "Carnify");
+      setPosSettings({
+        defaultPaymentMethod:
+          (settings.defaultPaymentMethod as PosSettings["defaultPaymentMethod"]) ??
+          DEFAULT_POS.defaultPaymentMethod,
+        stockAlertThreshold:
+          settings.stockAlertThreshold ?? DEFAULT_POS.stockAlertThreshold,
+        requireConfirmOnCheckout:
+          settings.requireConfirmOnCheckout ?? DEFAULT_POS.requireConfirmOnCheckout,
+      });
+    });
+    getInventoryForPos().then((rows) => {
+      setInventoryByProduct(
+        Object.fromEntries(rows.map((row) => [row.productId, { quantity: row.quantity, unit: row.unit }]))
+      );
+    });
   }, [loadSession, products.length, setProducts]);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("todos");
-  const [showWeightModal, setShowWeightModal] = useState(false);
-  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [paymentSplits, setPaymentSplits] = useState<{ method: string; amount: number }[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [clientSearch, setClientSearch] = useState("");
-  const [scanResult, setScanResult] = useState<ScanResult>(null);
-  const [weightValue, setWeightValue] = useState("");
   
   const selectedClient = clients.find(c => c.id === selectedClientId);
 
   // PLU map rebuilt when products change
   const pluMap = useMemo(() => new Map(products.map((p) => [p.plu, p])), [products]);
+  const reservedQuantityByProduct = useMemo(() => {
+    const reserved: Record<string, number> = {};
+    cart.forEach((item) => {
+      reserved[item.productId] = (reserved[item.productId] ?? 0) + item.quantity;
+    });
+    return reserved;
+  }, [cart]);
+
+  const getAvailableStock = useCallback((productId: string) => {
+    const inventory = inventoryByProduct[productId];
+    if (!inventory) return null;
+    return inventory.quantity - (reservedQuantityByProduct[productId] ?? 0);
+  }, [inventoryByProduct, reservedQuantityByProduct]);
+
+  const validateStockAvailability = useCallback((product: Product, requestedQuantity: number) => {
+    const available = getAvailableStock(product.id);
+    if (available === null) return null;
+    if (available < requestedQuantity) {
+      return `Stock insuficiente para ${product.name}. Disponible: ${Math.max(0, available).toFixed(product.unit === "kg" ? 3 : 0)} ${product.unit}.`;
+    }
+    return null;
+  }, [getAvailableStock]);
 
   // ── Barcode scanner buffer ─────────────────────────────────────────────
   const scanBuffer = useRef("");
@@ -109,7 +195,13 @@ export default function POSContent() {
       const byPlu = pluMap.get(barcode.padStart(5, "0"));
       if (byPlu) {
         if (byPlu.unit === "un") {
-          addToCart({ id: createCartItemId(byPlu.id), name: byPlu.name, price: byPlu.price, quantity: 1, unit: "un", emoji: byPlu.emoji });
+          const stockError = validateStockAvailability(byPlu, 1);
+          if (stockError) {
+            setScanResult({ ok: false, message: stockError });
+            setTimeout(() => setScanResult(null), 3000);
+            return;
+          }
+          addToCart({ id: createCartItemId(byPlu.id), productId: byPlu.id, name: byPlu.name, price: byPlu.price, quantity: 1, unit: "un", emoji: byPlu.emoji });
           setScanResult({ ok: true, product: byPlu, weightKg: 1, total: byPlu.price });
         } else {
           setScanResult({ ok: false, message: `${byPlu.name} requiere peso — usá el ticket de la balanza` });
@@ -122,11 +214,19 @@ export default function POSContent() {
       if (!product) {
         setScanResult({ ok: false, message: `PLU ${parsed.plu} no registrado` });
       } else {
-        const lineTotal = product.price * parsed.weightKg;
+        const effectivePrice = getEffectivePrice(product);
+        const lineTotal = effectivePrice * parsed.weightKg;
+        const stockError = validateStockAvailability(product, parsed.weightKg);
+        if (stockError) {
+          setScanResult({ ok: false, message: stockError });
+          setTimeout(() => setScanResult(null), 3000);
+          return;
+        }
         addToCart({
           id: createCartItemId(product.id),
+          productId: product.id,
           name: product.name,
-          price: product.price,
+          price: effectivePrice,
           quantity: parsed.weightKg,
           unit: "kg",
           emoji: product.emoji,
@@ -135,18 +235,62 @@ export default function POSContent() {
       }
     }
     setTimeout(() => setScanResult(null), 3000);
-  }, [addToCart, createCartItemId, pluMap]);
+  }, [addToCart, createCartItemId, pluMap, validateStockAvailability]);
 
-  // Global keydown listener — barcode scanners type the full code in < 80 ms
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Global keydown listener — barcode scanners + keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input that's not the search bar
       const tag = (e.target as HTMLElement).tagName;
-      const isSearchInput = (e.target as HTMLElement).classList.contains("pos-search__input");
+      const isSearchInput = searchInputRef.current === e.target;
+
+      // F2: Focus search
+      if (e.key === "F2") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // F8: Open checkout (with stock validation bypass if holding Shift)
+      if (e.key === "F8") {
+        e.preventDefault();
+        const posBtn = document.querySelector(".pos-checkout-btn") as HTMLButtonElement;
+        if (posBtn && !posBtn.disabled) posBtn.click();
+        return;
+      }
+
+      // Escape: Close any open modal
+      if (e.key === "Escape") {
+        if (showWeightModal) { setShowWeightModal(false); return; }
+        if (showCheckoutModal) { setShowCheckoutModal(false); return; }
+        if (showSuccessModal) { clearCart(); setShowSuccessModal(false); return; }
+        return;
+      }
+
+      // Ignore if user is typing in an input that's not the search bar
       if ((tag === "INPUT" || tag === "TEXTAREA") && !isSearchInput) return;
 
       if (e.key === "Enter") {
-        if (scanBuffer.current.length >= 8) {
+        // If search has content, first try as PLU lookup
+        if (search) {
+          const padded = search.trim().padStart(5, "0");
+          const bySearchPlu = pluMap.get(padded);
+          if (bySearchPlu) {
+            if (bySearchPlu.unit === "un") {
+              const stockError = validateStockAvailability(bySearchPlu, 1);
+              if (!stockError) {
+                addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: bySearchPlu.price, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
+                setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: bySearchPlu.price });
+                setTimeout(() => setScanResult(null), 2000);
+              }
+            }
+            setSearch("");
+            return;
+          }
+        }
+
+        if (scanBuffer.current.length >= 6) {
           processScan(scanBuffer.current);
         }
         scanBuffer.current = "";
@@ -154,7 +298,7 @@ export default function POSContent() {
         return;
       }
 
-      if (e.key.length === 1) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         scanBuffer.current += e.key;
         if (scanTimer.current) clearTimeout(scanTimer.current);
         scanTimer.current = setTimeout(() => {
@@ -164,7 +308,7 @@ export default function POSContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [processScan]);
+  }, [processScan, search, pluMap, addToCart, createCartItemId, validateStockAvailability, showWeightModal, showCheckoutModal, showSuccessModal]);
 
   // ── Product helpers ──────────────────────────────────────────────────────
   const filteredProducts = products.filter((p) => {
@@ -174,12 +318,19 @@ export default function POSContent() {
   });
 
   const handleProductClick = (product: Product) => {
+    const stockError = validateStockAvailability(product, 1);
+    if (product.unit === "un" && stockError) {
+      setScanResult({ ok: false, message: stockError });
+      setTimeout(() => setScanResult(null), 3000);
+      return;
+    }
+
     if (product.unit === "kg") {
       setActiveProduct(product);
       setWeightValue("");
       setShowWeightModal(true);
     } else {
-      addToCart({ id: createCartItemId(product.id), name: product.name, price: product.price, quantity: 1, unit: "un", emoji: product.emoji });
+      addToCart({ id: createCartItemId(product.id), productId: product.id, name: product.name, price: getEffectivePrice(product), quantity: 1, unit: "un", emoji: product.emoji });
     }
   };
 
@@ -187,17 +338,57 @@ export default function POSContent() {
     if (!activeProduct) return;
     const weight = parseFloat(weightValue.replace(",", "."));
     if (!isNaN(weight) && weight > 0) {
-      addToCart({ id: createCartItemId(activeProduct.id), name: activeProduct.name, price: activeProduct.price, quantity: weight, unit: "kg", emoji: activeProduct.emoji });
+      const stockError = validateStockAvailability(activeProduct, weight);
+      if (stockError) {
+        setScanResult({ ok: false, message: stockError });
+        setTimeout(() => setScanResult(null), 3000);
+        return;
+      }
+      addToCart({ id: createCartItemId(activeProduct.id), productId: activeProduct.id, name: activeProduct.name, price: activeProduct.price, quantity: weight, unit: "kg", emoji: activeProduct.emoji });
       setShowWeightModal(false);
     }
   };
 
+  const openCheckout = () => {
+    setCheckoutError(null);
+    if (paymentSplits.length === 0) {
+      setPaymentSplits([
+        {
+          method: posSettings.defaultPaymentMethod,
+          amount: total,
+        },
+      ]);
+    }
+    setShowCheckoutModal(true);
+  };
+
   const handleCompleteSale = async () => {
-    const fiadoTotal = paymentSplits
-      .filter(s => s.method === 'fiado')
-      .reduce((acc, s) => acc + s.amount, 0);
+    setCheckoutError(null);
+    if (paymentSplits.length === 0) {
+      setCheckoutError("Elegi al menos un medio de pago.");
+      return;
+    }
+
+    const splitTotal = paymentSplits.reduce((acc, split) => acc + split.amount, 0);
+    if (Math.abs(splitTotal - total) > 0.01) {
+      setCheckoutError("La suma de los pagos no coincide con el total de la venta.");
+      return;
+    }
+
+    if (paymentSplits.some((split) => split.method === "fiado") && !selectedClientId) {
+      setCheckoutError("Selecciona un cliente para registrar una venta fiada.");
+      return;
+    }
+
+    if (posSettings.requireConfirmOnCheckout) {
+      const confirmed = window.confirm(
+        `Confirmar cobro por ${formatCurrency(total)} para registrar la venta.`
+      );
+      if (!confirmed) return;
+    }
 
     const cartItems = cart.map((item) => ({
+      productId: item.productId,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
@@ -205,24 +396,35 @@ export default function POSContent() {
       emoji: item.emoji,
     }));
 
-    await dbRecordSale(total, paymentSplits, cartItems, selectedClientId || undefined, selectedClient?.name);
+    try {
+      await dbRecordSale(
+        total,
+        paymentSplits,
+        cartItems,
+        selectedClientId || undefined,
+        selectedClient?.name
+      );
 
-    if (fiadoTotal > 0 && selectedClientId) {
-      await dbAddSaleToAccount(
-        selectedClientId,
-        fiadoTotal,
-        `Venta Ticket #${Date.now().toString().slice(-4)} (POS)`
+      await loadSession();
+      const inventoryRows = await getInventoryForPos();
+      setInventoryByProduct(
+        Object.fromEntries(inventoryRows.map((row) => [row.productId, { quantity: row.quantity, unit: row.unit }]))
+      );
+      setShowCheckoutModal(false);
+      setShowSuccessModal(true);
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error ? error.message : "No se pudo registrar la venta."
       );
     }
-
-    await loadSession();
-    setShowCheckoutModal(false);
-    setShowSuccessModal(true);
   };
 
   const handleFinishSuccess = () => {
     clearCart();
+    setPaymentSplits([]);
     setSelectedClientId(null);
+    setClientSearch("");
+    setCheckoutError(null);
     setShowSuccessModal(false);
   };
 
@@ -248,7 +450,7 @@ export default function POSContent() {
       .total{font-size:15px;font-weight:bold}
       .footer{text-align:center;margin-top:12px;font-size:10px;color:#777}
     </style></head><body>
-      <h2>Carnify</h2>
+      <h2>${businessName}</h2>
       <p class="sub">${date}</p>
       <div class="divider"></div>
       <table>${lines}</table>
@@ -323,8 +525,9 @@ export default function POSContent() {
           <div className="pos-search">
             <Search size={18} className="pos-search__icon" />
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Buscar producto..."
+              placeholder="Buscar producto... (F2)"
               className="pos-search__input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -356,15 +559,52 @@ export default function POSContent() {
               key={product.id}
               className="pos-card"
               onClick={() => handleProductClick(product)}
+              style={
+                getAvailableStock(product.id) !== null && getAvailableStock(product.id)! <= 0
+                  ? { opacity: 0.6, cursor: "not-allowed" }
+                  : undefined
+              }
             >
               <div className="pos-card__emoji-wrap">
                 <div className="pos-card__emoji">{product.emoji}</div>
               </div>
               <div className="pos-card__name">{product.name}</div>
               <div className="pos-card__price">
-                {formatCurrency(product.price)} / {product.unit}
+                {product.discountPercent && product.discountPercent > 0 ? (
+                  <>
+                    <span style={{ textDecoration: "line-through", color: "#999", marginRight: 6, fontSize: "0.78rem" }}>
+                      {formatCurrency(product.price)}
+                    </span>
+                    <span style={{ color: "#dc2626", fontWeight: 800 }}>
+                      {formatCurrency(product.price * (1 - product.discountPercent / 100))}
+                    </span>
+                  </>
+                ) : (
+                  formatCurrency(product.price)
+                )}
+                <span className="pos-card__unit">/{product.unit}</span>
               </div>
+              {product.discountPercent && product.discountPercent > 0 && (
+                <div className="pos-card__promo">{product.discountPercent}% OFF</div>
+              )}
               <div className="pos-card__plu">PLU {product.plu}</div>
+              {getAvailableStock(product.id) !== null && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    color:
+                      getAvailableStock(product.id)! <= 0
+                        ? "var(--danger)"
+                        : getAvailableStock(product.id)! <= posSettings.stockAlertThreshold
+                          ? "#f59e0b"
+                          : "var(--success)",
+                  }}
+                >
+                  Stock: {formatNumber(Math.max(0, getAvailableStock(product.id)!))} {inventoryByProduct[product.id]?.unit ?? product.unit}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -441,7 +681,7 @@ export default function POSContent() {
             <button
               className="pos-checkout-btn"
               disabled={cart.length === 0 || !currentSession}
-              onClick={() => setShowCheckoutModal(true)}
+              onClick={openCheckout}
             >
               {!currentSession ? "Caja cerrada" : `Cobrar ${cart.length > 0 ? formatCurrency(total) : ""}`}
             </button>
@@ -692,6 +932,23 @@ export default function POSContent() {
                       </div>
                     )}
                   </div>
+
+                  {checkoutError && (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(239, 68, 68, 0.24)",
+                        background: "rgba(239, 68, 68, 0.08)",
+                        color: "var(--danger)",
+                        fontSize: "0.84rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {checkoutError}
+                    </div>
+                  )}
 
                   <div className="checkout-actions">
                     <button 

@@ -15,6 +15,8 @@ export interface StaffProfile {
   hireDate: string;
   lastActivity: string;
   createdAt: string;
+  memberId?: string | null;
+  memberEmail?: string | null;
 }
 
 export interface StaffFormData {

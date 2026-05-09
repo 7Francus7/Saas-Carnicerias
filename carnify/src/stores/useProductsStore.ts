@@ -8,6 +8,11 @@ export interface Product {
   emoji: string;
   price: number;
   unit: string;
+  discountPercent?: number | null;
+  discountEndDate?: Date | string | null;
+  productType?: string | null;
+  baseUnit?: string | null;
+  conversionFactor?: number | null;
 }
 
 interface ProductsState {

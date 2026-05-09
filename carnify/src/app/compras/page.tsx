@@ -1,15 +1,15 @@
 import { requirePageAccess } from "@/lib/permissions";
 import Sidebar from "@/components/layout/Sidebar";
-import ClientsContent from "@/components/clients/ClientsContent";
+import ComprasContent from "@/components/compras/ComprasContent";
 
-export default async function ClientsPage() {
-  await requirePageAccess("clientes");
+export default async function ComprasPage() {
+  await requirePageAccess("compras");
 
   return (
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
-        <ClientsContent />
+        <ComprasContent />
       </main>
     </div>
   );

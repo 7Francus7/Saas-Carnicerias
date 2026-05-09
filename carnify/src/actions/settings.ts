@@ -1,15 +1,38 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenant } from "./_helpers";
+import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 
 export async function getSettings() {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("config");
   return prisma.businessSettings.upsert({
     where: { organizationId: tenantId },
     create: { organizationId: tenantId },
     update: {},
+  });
+}
+
+export async function getPosRuntimeSettings() {
+  const { tenantId } = await requireTenantAndSection("pos");
+  return prisma.businessSettings.findUnique({
+    where: { organizationId: tenantId },
+    select: {
+      nombre: true,
+      defaultPaymentMethod: true,
+      stockAlertThreshold: true,
+      requireConfirmOnCheckout: true,
+    },
+  });
+}
+
+export async function getInventoryRuntimeSettings() {
+  const { tenantId } = await requireTenantAndSection("inventario");
+  return prisma.businessSettings.findUnique({
+    where: { organizationId: tenantId },
+    select: {
+      stockAlertThreshold: true,
+    },
   });
 }
 
@@ -24,7 +47,7 @@ export async function updateSettings(data: {
   stockAlertThreshold?: number;
   requireConfirmOnCheckout?: boolean;
 }) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("config");
   await prisma.businessSettings.upsert({
     where: { organizationId: tenantId },
     create: { organizationId: tenantId, ...data },

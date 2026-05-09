@@ -23,8 +23,10 @@ export const NAV_ITEMS: NavSection[] = [
   {
     section: "Gestión",
     items: [
-      { label: "Productos", icon: "Beef",       href: "/productos", badge: null, sectionKey: "productos" },
-      { label: "Costos",    icon: "Calculator", href: "/costos",    badge: null, sectionKey: "costos" },
+      { label: "Productos",  icon: "Beef",       href: "/productos", badge: null, sectionKey: "productos" },
+      { label: "Inventario", icon: "Package",    href: "/inventario", badge: null, sectionKey: "inventario" },
+      { label: "Costos",     icon: "Calculator", href: "/costos",    badge: null, sectionKey: "costos" },
+      { label: "Compras",    icon: "Truck",      href: "/compras",   badge: null, sectionKey: "compras" },
     ],
   },
   {
@@ -44,7 +46,8 @@ export const NAV_ITEMS: NavSection[] = [
   {
     section: "Sistema",
     items: [
-      { label: "Empleados", icon: "Users2", href: "/empleados", badge: null, sectionKey: "empleados" },
+      { label: "Empleados",     icon: "Users2",   href: "/empleados", badge: null, sectionKey: "empleados" },
+      { label: "Configuracion", icon: "Settings", href: "/config",    badge: null, sectionKey: "config" },
     ],
   },
 ];

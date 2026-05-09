@@ -4,11 +4,12 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Beef, Search, Plus, Tag,
   Edit2, Trash2, X, ChevronDown, TrendingUp,
-  LayoutGrid, List, Check, Loader2,
+  LayoutGrid, List, Check, Loader2, UtensilsCrossed,
 } from "lucide-react";
 import { PRODUCT_CATEGORIES, formatCurrency } from "@/lib/constants";
 import { useProductsStore, type Product } from "@/stores/useProductsStore";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/actions/products";
+import RecipeModal from "./RecipeModal";
 
 const UNITS = ["kg", "un", "lt"] as const;
 const EMPTY_FORM = { plu: "", name: "", category: "", price: "", unit: "kg", emoji: "🥩" };
@@ -37,6 +38,7 @@ export default function ProductosContent() {
 
   // Inline delete confirm
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [recipeProduct, setRecipeProduct] = useState<Product | null>(null);
 
   // Derived
   const maxPrice = useMemo(() => Math.max(...products.map((p) => p.price), 1), [products]);
@@ -269,6 +271,9 @@ export default function ProductosContent() {
                     <button className="icon-btn" onClick={() => openEdit(p)} title="Editar">
                       <Edit2 size={13} />
                     </button>
+                    <button className="icon-btn" onClick={() => setRecipeProduct(p)} title="Receta">
+                      <UtensilsCrossed size={13} />
+                    </button>
                     <button
                       className={`icon-btn ${isConfirming ? "icon-btn--confirming" : "icon-btn--danger"}`}
                       onClick={() => handleDelete(p.id)}
@@ -342,6 +347,9 @@ export default function ProductosContent() {
                               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                                 <button className="icon-btn" onClick={() => openEdit(p)}>
                                   <Edit2 size={13} />
+                                </button>
+                                <button className="icon-btn" onClick={() => setRecipeProduct(p)} title="Receta">
+                                  <UtensilsCrossed size={13} />
                                 </button>
                                 <button
                                   className={`icon-btn ${isConfirming ? "icon-btn--confirming" : "icon-btn--danger"}`}
@@ -643,6 +651,8 @@ export default function ProductosContent() {
         .select-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
         .modal-actions { display: flex; gap: 12px; justify-content: flex-end; padding-top: 8px; }
       `}</style>
+
+      {recipeProduct && <RecipeModal product={recipeProduct} onClose={() => setRecipeProduct(null)} />}
     </div>
   );
 }

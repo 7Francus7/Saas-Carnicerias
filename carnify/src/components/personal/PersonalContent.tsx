@@ -5,7 +5,7 @@ import {
   UserCog, Search, UserPlus, Phone, Hash,
   Trash2, Edit3, X,
   Briefcase, Calendar, DollarSign, Clock,
-  AlertTriangle, Users, StickyNote,
+  AlertTriangle, Users, StickyNote, LogIn,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import { useStaffStore, StaffProfile, StaffFormData, ROLE_LABELS, STATUS_LABELS } from "@/stores/useStaffStore";
@@ -14,6 +14,9 @@ import {
   createStaff,
   updateStaff as dbUpdateStaff,
   deleteStaff as dbDeleteStaff,
+  getAvailableMembers,
+  linkStaffToMember,
+  unlinkStaffMember,
 } from "@/actions/staff";
 
 type ModalType = 'none' | 'addStaff' | 'editStaff' | 'deleteConfirm';
@@ -50,6 +53,8 @@ function mapDbStaff(s: any): StaffProfile {
     hireDate: new Date(s.hireDate).toISOString(),
     lastActivity: new Date(s.lastActivity).toISOString(),
     createdAt: new Date(s.createdAt).toISOString(),
+    memberId: s.member?.id ?? null,
+    memberEmail: s.member?.user?.email ?? null,
   };
 }
 
@@ -61,10 +66,33 @@ export default function PersonalContent() {
   const [modal, setModal] = useState<ModalType>('none');
   const [staffForm, setStaffForm] = useState<StaffFormData>(EMPTY_FORM);
 
+  const [availableMembers, setAvailableMembers] = useState<{ id: string; role: string; user: { email: string; name: string } }[]>([]);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+
   const loadStaff = useCallback(async () => {
     const data = await getStaff();
     hydrate(data.map(mapDbStaff));
   }, [hydrate]);
+
+  const openLinkModal = async () => {
+    if (!selectedStaff) return;
+    const members = await getAvailableMembers(selectedStaff.id);
+    setAvailableMembers(members);
+    setShowLinkModal(true);
+  };
+
+  const handleLinkMember = async (memberId: string) => {
+    if (!selectedStaff) return;
+    await linkStaffToMember(selectedStaff.id, memberId);
+    setShowLinkModal(false);
+    await loadStaff();
+  };
+
+  const handleUnlinkMember = async () => {
+    if (!selectedStaff) return;
+    await unlinkStaffMember(selectedStaff.id);
+    await loadStaff();
+  };
 
   useEffect(() => { void loadStaff(); }, [loadStaff]);
   const [now] = useState(() => Date.now());
@@ -330,6 +358,20 @@ export default function PersonalContent() {
                     <div className="info-row"><span>Email</span><strong>{selectedStaff.email || '—'}</strong></div>
                     <div className="info-row"><span>Dirección</span><strong>{selectedStaff.address || '—'}</strong></div>
                     <div className="info-row"><span>Cargo</span><strong>{ROLE_LABELS[selectedStaff.role]}</strong></div>
+                    <div className="info-row"><span>Usuario sistema</span>
+                      <strong>
+                        {selectedStaff.memberId ? (
+                          <span className="flex items-center gap-1 text-xs">
+                            <span className="text-emerald-600">✓ {selectedStaff.memberEmail || 'Vinculado'}</span>
+                            <button onClick={handleUnlinkMember} className="text-gray-400 hover:text-red-500 ml-1" title="Desvincular">✕</button>
+                          </span>
+                        ) : (
+                            <button onClick={openLinkModal} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                            <LogIn className="w-3 h-3" /> Vincular
+                          </button>
+                        )}
+                      </strong>
+                    </div>
                     <div className="info-row"><span>Estado</span>
                       <strong className={selectedStaff.status === 'active' ? 'text-success' : selectedStaff.status === 'suspended' ? 'text-danger' : ''}>
                         {STATUS_LABELS[selectedStaff.status]}
@@ -601,6 +643,38 @@ export default function PersonalContent() {
                   <Trash2 size={14} /> Eliminar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLinkModal && selectedStaff && (
+        <div className="modal-overlay" onClick={() => setShowLinkModal(false)}>
+          <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3>Vincular usuario sistema</h3>
+              <button className="modal__close" onClick={() => setShowLinkModal(false)}><X size={18} /></button>
+            </div>
+            <div className="modal__body" style={{ maxHeight: 300, overflowY: "auto" }}>
+              {availableMembers.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No hay usuarios del sistema disponibles para vincular.</p>
+              ) : (
+                <div className="space-y-2">
+                  {availableMembers.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleLinkMember(m.id)}
+                      className="w-full text-left p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{m.user.name}</p>
+                        <p className="text-xs text-gray-400">{m.user.email} · {m.role}</p>
+                      </div>
+                      <LogIn className="w-4 h-4 text-blue-500" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

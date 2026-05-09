@@ -91,6 +91,10 @@ model Organization {
   clients          Client[]
   staff            Staff[]
   stockMovements   StockMovement[]
+  inventoryItems   InventoryItem[]
+  recipeItems      RecipeItem[]
+  suppliers        Supplier[]
+  purchases        Purchase[]
   settings         BusinessSettings?
 
   @@map("organization")
@@ -112,6 +116,7 @@ model Member {
   status         String?
   notes          String?
   createdAt      DateTime
+  staff          Staff?
 
   @@map("member")
 }
@@ -132,24 +137,53 @@ model Invitation {
 // ─── Business tables ───────────────────────────────────────────────────────
 
 model Product {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plu            String
-  name           String
-  category       String
-  emoji          String
-  price          Float
-  unit           String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  cost           ProductCost?
-  saleItems      SaleItem[]
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plu              String
+  name             String
+  category         String
+  emoji            String
+  price            Float
+  unit             String
+  baseUnit         String       @default("kg")
+  conversionFactor Float        @default(1)
+  productType      String       @default("raw")
+  discountPercent  Float        @default(0)
+  discountEndDate  DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  cost             ProductCost?
+  saleItems        SaleItem[]
+  stockMovements   StockMovement[]
+  inventoryItem    InventoryItem?
+  recipeInputs     RecipeItem[]  @relation("RecipeInput")
+  recipeOutput     RecipeItem[]  @relation("RecipeOutput")
+  purchaseItems    PurchaseItem[]
 
   @@unique([organizationId, plu])
   @@index([organizationId, category])
   @@index([organizationId, name])
+  @@index([organizationId, productType])
   @@map("product")
+}
+
+// ─── Recipe / BOM ──────────────────────────────────────────────────────────
+model RecipeItem {
+  id           String   @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outputId     String
+  output       Product  @relation("RecipeOutput", fields: [outputId], references: [id], onDelete: Cascade)
+  inputId      String
+  input        Product  @relation("RecipeInput", fields: [inputId], references: [id], onDelete: Cascade)
+  quantity     Float
+  unit         String
+  yieldFactor  Float    @default(1)
+
+  @@index([organizationId, outputId])
+  @@index([organizationId, inputId])
+  @@map("recipe_item")
 }
 
 model ProductCost {
@@ -219,6 +253,7 @@ model SaleItem {
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   name      String
   price     Float
+  unitCost  Float?
   quantity  Float
   unit      String
   emoji     String?
@@ -303,6 +338,8 @@ model Staff {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   dni            String       @default("")
+  memberId       String?      @unique
+  member         Member?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
   phone          String       @default("")
   role           String
   address        String       @default("")
@@ -326,13 +363,33 @@ model StockMovement {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   date           DateTime     @default(now())
   type           String
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName    String
   quantity       Float
   unit           String
   supplier       String?
+  batch          String?
+  origin         String?
   note           String?
 
+  @@index([organizationId, productId])
+  @@index([organizationId, batch])
   @@map("stock_movement")
+}
+
+model InventoryItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productId      String       @unique
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity       Float        @default(0)
+  unit           String
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@map("inventory_item")
 }
 
 model EmployeePermissions {
@@ -344,6 +401,63 @@ model EmployeePermissions {
   updatedAt      DateTime @updatedAt
 
   @@map("employee_permissions")
+}
+
+// ─── Suppliers & Purchases ──────────────────────────────────────────────────
+
+model Supplier {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  contactName    String       @default("")
+  phone          String       @default("")
+  email          String       @default("")
+  address        String       @default("")
+  cuit           String       @default("")
+  notes          String       @default("")
+  status         String       @default("active")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  purchases      Purchase[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, name])
+  @@map("supplier")
+}
+
+model Purchase {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierId     String
+  supplier       Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  date           DateTime       @default(now())
+  total          Float
+  paymentMethod  String         @default("cash")
+  status         String         @default("pending")
+  notes          String         @default("")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  items          PurchaseItem[]
+
+  @@index([organizationId, date])
+  @@index([organizationId, status])
+  @@map("purchase")
+}
+
+model PurchaseItem {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity   Float
+  unit       String
+  unitCost   Float
+  totalCost  Float
+
+  @@map("purchase_item")
 }
 
 model BusinessSettings {

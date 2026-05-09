@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenant } from "./_helpers";
+import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -20,15 +20,16 @@ const StaffSchema = z.object({
 });
 
 export async function getStaff() {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("personal");
   return prisma.staff.findMany({
     where: { organizationId: tenantId },
+    include: { member: { select: { id: true, userId: true } } },
     orderBy: { name: "asc" },
   });
 }
 
 export async function createStaff(data: z.infer<typeof StaffSchema>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("personal");
   const parsed = StaffSchema.parse(data);
   const staff = await prisma.staff.create({
     data: { ...parsed, organizationId: tenantId },
@@ -38,13 +39,42 @@ export async function createStaff(data: z.infer<typeof StaffSchema>) {
 }
 
 export async function updateStaff(id: string, data: Partial<z.infer<typeof StaffSchema>>) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("personal");
   await prisma.staff.updateMany({ where: { id, organizationId: tenantId }, data });
   revalidatePath("/personal");
 }
 
 export async function deleteStaff(id: string) {
-  const { tenantId } = await requireTenant();
+  const { tenantId } = await requireTenantAndSection("personal");
   await prisma.staff.deleteMany({ where: { id, organizationId: tenantId } });
+  revalidatePath("/personal");
+}
+
+export async function getAvailableMembers(_staffId: string) {
+  const { tenantId } = await requireTenantAndSection("personal");
+  return prisma.member.findMany({
+    where: {
+      organizationId: tenantId,
+      staff: null,
+    },
+    select: { id: true, role: true, user: { select: { email: true, name: true } } },
+  });
+}
+
+export async function linkStaffToMember(staffId: string, memberId: string) {
+  const { tenantId } = await requireTenantAndSection("personal");
+  await prisma.staff.updateMany({
+    where: { id: staffId, organizationId: tenantId },
+    data: { memberId },
+  });
+  revalidatePath("/personal");
+}
+
+export async function unlinkStaffMember(staffId: string) {
+  const { tenantId } = await requireTenantAndSection("personal");
+  await prisma.staff.updateMany({
+    where: { id: staffId, organizationId: tenantId },
+    data: { memberId: null },
+  });
   revalidatePath("/personal");
 }
