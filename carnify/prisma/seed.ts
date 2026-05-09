@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/db";
 
 async function main() {
   const org = await prisma.organization.upsert({
@@ -10,6 +8,7 @@ async function main() {
       id: "seed-org",
       name: "Carnicería Demo",
       slug: "demo",
+      createdAt: new Date(),
     },
   });
 
