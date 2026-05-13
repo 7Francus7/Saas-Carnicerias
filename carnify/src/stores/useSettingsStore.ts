@@ -13,6 +13,7 @@ export interface PosSettings {
   defaultPaymentMethod: 'cash' | 'transfer' | 'card' | 'link' | 'fiado';
   stockAlertThreshold: number;
   requireConfirmOnCheckout: boolean;
+  enforceStock: boolean;
 }
 
 interface SettingsState {
@@ -36,6 +37,7 @@ export const DEFAULT_POS: PosSettings = {
   defaultPaymentMethod: 'cash',
   stockAlertThreshold: 10,
   requireConfirmOnCheckout: false,
+  enforceStock: true,
 };
 
 export const useSettingsStore = create<SettingsState>()((set) => ({

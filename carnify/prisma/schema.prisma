@@ -482,6 +482,7 @@ model BusinessSettings {
   defaultPaymentMethod     String       @default("cash")
   stockAlertThreshold      Int          @default(10)
   requireConfirmOnCheckout Boolean      @default(false)
+  enforceStock             Boolean      @default(true)
 
   @@map("business_settings")
 }

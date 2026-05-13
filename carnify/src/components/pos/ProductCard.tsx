@@ -38,10 +38,10 @@ function ProductCardInner({
       <div className="pos-card__price">
         {discountPrice !== null ? (
           <>
-            <span style={{ textDecoration: "line-through", color: "#999", marginRight: 6, fontSize: "0.78rem" }}>
+            <span style={{ textDecoration: "line-through", color: "var(--text-muted)", marginRight: 6, fontSize: "0.78rem" }}>
               {formatCurrency(product.price)}
             </span>
-            <span style={{ color: "#dc2626", fontWeight: 800 }}>
+            <span style={{ color: "var(--danger)", fontWeight: 800 }}>
               {formatCurrency(discountPrice)}
             </span>
           </>
@@ -64,7 +64,7 @@ function ProductCardInner({
               availableStock <= 0
                 ? "var(--danger)"
                 : availableStock <= stockAlertThreshold
-                  ? "#f59e0b"
+                  ? "var(--warning)"
                   : "var(--success)",
           }}
         >

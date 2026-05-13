@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  X, Plus, Trash2, Loader2, Package, Beef, Calculator,
+  X, Plus, Trash2, Loader2, Calculator,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import { getRecipes, upsertRecipeItem, deleteRecipeItem } from "@/actions/recipes";
@@ -23,6 +23,17 @@ interface Props {
   product: Product;
   onClose: () => void;
 }
+
+const fieldStyle: React.CSSProperties = {
+  background: "var(--bg-secondary)",
+  border: "1px solid var(--border-light)",
+  color: "var(--text-primary)",
+  borderRadius: "var(--radius-md)",
+  fontFamily: "var(--font-body)",
+  outline: "none",
+  fontSize: "0.85rem",
+  padding: "7px 10px",
+};
 
 export default function RecipeModal({ product, onClose }: Props) {
   const products = useProductsStore((s) => s.products);
@@ -109,126 +120,173 @@ export default function RecipeModal({ product, onClose }: Props) {
   }, 0);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{product.emoji}</span>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 580 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal__header">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "1.6rem", lineHeight: 1 }}>{product.emoji}</span>
             <div>
-              <h3 className="text-lg font-bold">{product.name}</h3>
-              <p className="text-xs text-gray-400">Receta / BOM — {product.plu}</p>
+              <h3 className="modal__title">{product.name}</h3>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                BOM / Receta — PLU {product.plu}
+              </span>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
+          <button className="modal__close" onClick={onClose}>
+            <X size={16} />
           </button>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-          </div>
-        ) : (
-          <>
-            {/* Items */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm text-gray-700">Insumos</h4>
-                <button
-                  onClick={addItem}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
-                >
-                  <Plus className="w-3 h-3" /> Agregar insumo
-                </button>
-              </div>
-              {items.length === 0 && (
-                <p className="text-sm text-gray-400 italic py-4 text-center">
-                  Sin insumos definidos. Agregá los ingredientes del producto elaborado.
-                </p>
-              )}
-              {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl">
-                  <select
-                    value={item.inputId}
-                    onChange={(e) => updateItem(idx, "inputId", e.target.value)}
-                    className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
-                  >
-                    <option value="">Seleccionar insumo</option>
-                    {products
-                      .filter((p) => p.id !== product.id)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.emoji} {p.name} (${p.price}/{p.unit})
-                        </option>
-                      ))}
-                  </select>
-                  <input
-                    type="number"
-                    placeholder="Cant"
-                    value={item.quantity || ""}
-                    onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
-                    className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
-                    step="0.1"
-                  />
-                  <select
-                    value={item.unit}
-                    onChange={(e) => updateItem(idx, "unit", e.target.value)}
-                    className="w-12 px-1 py-1.5 border border-gray-200 rounded-lg text-sm"
-                  >
-                    <option>kg</option><option>un</option><option>lt</option>
-                  </select>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    rto:{item.yieldFactor || 1}
+        <div style={{ padding: "20px 24px", overflowY: "auto", maxHeight: "calc(90vh - 160px)" }}>
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
+              <Loader2 size={22} className="animate-spin" style={{ color: "var(--primary)" }} />
+            </div>
+          ) : (
+            <>
+              {/* Items */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                    Insumos
                   </span>
                   <button
-                    onClick={() => removeItem(idx)}
-                    className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                    onClick={addItem}
+                    className="btn btn--ghost btn--sm"
+                    style={{ gap: 5, fontSize: "0.78rem" }}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Plus size={13} /> Agregar insumo
                   </button>
                 </div>
-              ))}
-            </div>
 
-            {/* Cost preview */}
-            {items.length > 0 && totalCost > 0 && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 flex items-center gap-1">
-                    <Calculator className="w-4 h-4" /> Costo receta estimado
-                  </span>
-                  <span className="font-bold text-emerald-700">{formatCurrency(totalCost)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Precio venta actual</span>
-                  <span className="font-medium">{formatCurrency(product.price)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Margen estimado</span>
-                  <span className={`font-bold ${product.price > totalCost ? "text-emerald-600" : "text-red-600"}`}>
-                    {product.price > 0
-                      ? `${Math.round(((product.price - totalCost) / product.price) * 100)}%`
-                      : "—"}
-                  </span>
+                {items.length === 0 && (
+                  <div style={{
+                    padding: "24px 16px", textAlign: "center",
+                    background: "var(--bg-secondary)", border: "1px dashed var(--border-light)",
+                    borderRadius: "var(--radius-md)",
+                  }}>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                      Sin insumos definidos. Agregá los ingredientes del producto elaborado.
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {items.map((item, idx) => (
+                    <div key={idx} style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "10px 12px", background: "var(--bg-secondary)",
+                      border: "1px solid var(--border-light)", borderRadius: "var(--radius-md)",
+                    }}>
+                      <select
+                        value={item.inputId}
+                        onChange={(e) => updateItem(idx, "inputId", e.target.value)}
+                        style={{ ...fieldStyle, flex: 1, minWidth: 0 }}
+                      >
+                        <option value="">Seleccionar insumo</option>
+                        {products
+                          .filter((p) => p.id !== product.id)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.emoji} {p.name} ({formatCurrency(p.price)}/{p.unit})
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Cant"
+                        value={item.quantity || ""}
+                        onChange={(e) => updateItem(idx, "quantity", Number(e.target.value))}
+                        style={{ ...fieldStyle, width: 68, textAlign: "center" }}
+                        step="0.1"
+                      />
+                      <select
+                        value={item.unit}
+                        onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                        style={{ ...fieldStyle, width: 50 }}
+                      >
+                        <option>kg</option><option>un</option><option>lt</option>
+                      </select>
+                      <button
+                        onClick={() => removeItem(idx)}
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          color: "var(--text-muted)", padding: 4, borderRadius: "var(--radius-sm)",
+                          transition: "color var(--transition-fast)", flexShrink: 0,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = "var(--danger)")}
+                        onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
 
-            <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-              >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Guardar Receta
-              </button>
-            </div>
-          </>
-        )}
+              {/* Cost preview */}
+              {items.length > 0 && totalCost > 0 && (
+                <div style={{
+                  background: "var(--bg-elevated)", border: "1px solid var(--border-light)",
+                  borderRadius: "var(--radius-md)", padding: "14px 16px",
+                  display: "flex", flexDirection: "column", gap: 8, marginBottom: 16,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
+                    <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Calculator size={14} style={{ color: "var(--text-muted)" }} />
+                      Costo de receta estimado
+                    </span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary)" }}>
+                      {formatCurrency(totalCost)}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Precio de venta</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-secondary)" }}>
+                      {formatCurrency(product.price)}
+                    </span>
+                  </div>
+                  <div style={{
+                    height: 1, background: "var(--border-light)", margin: "2px 0",
+                  }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>Margen estimado</span>
+                    <span style={{
+                      fontFamily: "var(--font-mono)", fontWeight: 700,
+                      color: product.price > totalCost ? "var(--success)" : "var(--danger)",
+                    }}>
+                      {product.price > 0
+                        ? `${Math.round(((product.price - totalCost) / product.price) * 100)}%`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{
+          padding: "16px 24px", borderTop: "1px solid var(--border-light)",
+          display: "flex", gap: 10,
+        }}>
+          <button
+            onClick={onClose}
+            className="btn btn--ghost"
+            style={{ flex: 1, justifyContent: "center" }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="btn btn--primary"
+            style={{ flex: 1, justifyContent: "center", gap: 8 }}
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            Guardar Receta
+          </button>
+        </div>
       </div>
     </div>
   );

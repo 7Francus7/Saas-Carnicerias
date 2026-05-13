@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, ShoppingBag, Receipt, Users,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+  CartesianGrid, Tooltip, PieChart, Pie, Cell,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
@@ -70,6 +70,44 @@ function CustomTooltip({ active, payload, label }: {
   return null;
 }
 
+function MeasuredChart({
+  height,
+  children,
+}: {
+  height: number;
+  children: (size: { width: number; height: number }) => React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const updateWidth = (nextWidth: number) => {
+      const roundedWidth = Math.round(nextWidth);
+      setWidth((prev) => (prev === roundedWidth ? prev : roundedWidth));
+    };
+
+    updateWidth(element.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      updateWidth(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="chart-container" style={{ height }}>
+      {width > 0 && children({ width, height })}
+    </div>
+  );
+}
+
 function StatCard({ stat, type, delay }: {
   stat: { value: number; trend: number; trendDirection: "up" | "down"; label: string };
   type: "revenue" | "orders" | "ticket" | "clients";
@@ -102,8 +140,9 @@ function StatCard({ stat, type, delay }: {
 }
 
 function LiveClock() {
-  const [time, setTime] = useState(() => new Date());
+  const [time, setTime] = useState<Date | null>(null);
   useEffect(() => {
+    setTime(new Date());
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -112,18 +151,22 @@ function LiveClock() {
     <div className="live-clock">
       <Clock size={16} style={{ color: "var(--text-tertiary)" }} />
       <div>
-        <div className="live-clock__time">
-          {time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })}
+        <div className="live-clock__time" suppressHydrationWarning>
+          {time
+            ? time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })
+            : "--:--:--"}
         </div>
-        <div className="live-clock__date" style={{ textTransform: "capitalize" }}>
-          {time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
+        <div className="live-clock__date" style={{ textTransform: "capitalize" }} suppressHydrationWarning>
+          {time
+            ? time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })
+            : ""}
         </div>
       </div>
     </div>
   );
 }
 
-function WeeklyChart({ data }: { data: WeeklyPoint[] }) {
+function WeeklyChart({ data, ready }: { data: WeeklyPoint[]; ready: boolean }) {
   const displayData = data.length > 0 ? data : 
     [{ day: "lun", ventas: 0 }, { day: "mar", ventas: 0 }, { day: "mié", ventas: 0 },
      { day: "jue", ventas: 0 }, { day: "vie", ventas: 0 }, { day: "sáb", ventas: 0 }, { day: "dom", ventas: 0 }];
@@ -136,46 +179,48 @@ function WeeklyChart({ data }: { data: WeeklyPoint[] }) {
           <div className="card__subtitle">Últimos 7 días</div>
         </div>
       </div>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="weekGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-            <XAxis
-              dataKey="day"
-              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-              axisLine={{ stroke: "var(--border-light)" }}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="ventas"
-              stroke="#3B82F6"
-              strokeWidth={2.5}
-              fill="url(#weekGradient)"
-              dot={false}
-              activeDot={{ r: 5, stroke: "#3B82F6", strokeWidth: 2, fill: "var(--bg-card)" }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {ready && (
+        <MeasuredChart height={280}>
+          {({ width, height }) => (
+            <AreaChart width={width} height={height} data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="weekGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+              <XAxis
+                dataKey="day"
+                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                axisLine={{ stroke: "var(--border-light)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="ventas"
+                stroke="#3B82F6"
+                strokeWidth={2.5}
+                fill="url(#weekGradient)"
+                dot={false}
+                activeDot={{ r: 5, stroke: "#3B82F6", strokeWidth: 2, fill: "var(--bg-card)" }}
+              />
+            </AreaChart>
+          )}
+        </MeasuredChart>
+      )}
     </div>
   );
 }
 
-function SalesChart({ data }: { data: ChartPoint[] }) {
+function SalesChart({ data, ready }: { data: ChartPoint[]; ready: boolean }) {
   const displayData = data.length > 0 ? data : [{ hour: "08:00", ventas: 0 }, { hour: "20:00", ventas: 0 }];
 
   return (
@@ -186,46 +231,48 @@ function SalesChart({ data }: { data: ChartPoint[] }) {
           <div className="card__subtitle">Evolución por hora</div>
         </div>
       </div>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-            <defs>
-              <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#DC2626" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#DC2626" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-            <XAxis
-              dataKey="hour"
-              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-              axisLine={{ stroke: "var(--border-light)" }}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="ventas"
-              stroke="#DC2626"
-              strokeWidth={2.5}
-              fill="url(#salesGradient)"
-              dot={false}
-              activeDot={{ r: 5, stroke: "#DC2626", strokeWidth: 2, fill: "var(--bg-card)" }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {ready && (
+        <MeasuredChart height={280}>
+          {({ width, height }) => (
+            <AreaChart width={width} height={height} data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#DC2626" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#DC2626" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+              <XAxis
+                dataKey="hour"
+                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                axisLine={{ stroke: "var(--border-light)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="ventas"
+                stroke="#DC2626"
+                strokeWidth={2.5}
+                fill="url(#salesGradient)"
+                dot={false}
+                activeDot={{ r: 5, stroke: "#DC2626", strokeWidth: 2, fill: "var(--bg-card)" }}
+              />
+            </AreaChart>
+          )}
+        </MeasuredChart>
+      )}
     </div>
   );
 }
 
-function RightPanel({ paymentData }: { paymentData: PaymentSlice[] }) {
+function RightPanel({ paymentData, ready }: { paymentData: PaymentSlice[]; ready: boolean }) {
   const router = useRouter();
   const actions = [
     { icon: <ShoppingCart size={18} />, cls: "pos", title: "Nueva Venta", desc: "Abrir punto de venta", href: "/pos" },
@@ -265,26 +312,28 @@ function RightPanel({ paymentData }: { paymentData: PaymentSlice[] }) {
           <div className="card__title">Medios de Pago</div>
           <div className="card__subtitle">Distribución del día</div>
         </div>
-        <div style={{ height: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={paymentData.length > 0 ? paymentData : emptyData}
-                cx="50%"
-                cy="50%"
-                innerRadius={38}
-                outerRadius={56}
-                paddingAngle={paymentData.length > 0 ? 3 : 0}
-                dataKey="amount"
-                stroke="none"
-              >
-                {(paymentData.length > 0 ? paymentData : emptyData).map((entry, idx) => (
-                  <Cell key={idx} fill={entry.color} stroke="transparent" />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        {ready && (
+          <MeasuredChart height={130}>
+            {({ width, height }) => (
+              <PieChart width={width} height={height}>
+                <Pie
+                  data={paymentData.length > 0 ? paymentData : emptyData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={38}
+                  outerRadius={56}
+                  paddingAngle={paymentData.length > 0 ? 3 : 0}
+                  dataKey="amount"
+                  stroke="none"
+                >
+                  {(paymentData.length > 0 ? paymentData : emptyData).map((entry, idx) => (
+                    <Cell key={idx} fill={entry.color} stroke="transparent" />
+                  ))}
+                </Pie>
+              </PieChart>
+            )}
+          </MeasuredChart>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
           {paymentData.length === 0 && (
             <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem", width: "100%" }}>
@@ -385,6 +434,7 @@ export default function DashboardContent() {
   const router = useRouter();
   const { currentSession, hydrate } = useCajaStore();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [chartsReady, setChartsReady] = useState(false);
 
   const loadSession = useCallback(async () => {
     const s = await getCurrentSession();
@@ -395,6 +445,10 @@ export default function DashboardContent() {
   }, [hydrate]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setChartsReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const { data: session } = useSession();
 
@@ -454,11 +508,11 @@ export default function DashboardContent() {
       {/* Left: Charts | Right: Quick Actions + Payment + Weekly */}
       <div className="dashboard-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SalesChart data={realData.hourlySales} />
+          <SalesChart data={realData.hourlySales} ready={chartsReady} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <RightPanel paymentData={realData.paymentBreakdown} />
-          <WeeklyChart data={realData.weeklySales} />
+          <RightPanel paymentData={realData.paymentBreakdown} ready={chartsReady} />
+          <WeeklyChart data={realData.weeklySales} ready={chartsReady} />
         </div>
       </div>
 

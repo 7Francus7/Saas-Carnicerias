@@ -62,6 +62,7 @@ export default function ConfigContent() {
       defaultPaymentMethod:    (s.defaultPaymentMethod as PosSettings["defaultPaymentMethod"]) ?? DEFAULT_POS.defaultPaymentMethod,
       stockAlertThreshold:     s.stockAlertThreshold    ?? DEFAULT_POS.stockAlertThreshold,
       requireConfirmOnCheckout: s.requireConfirmOnCheckout ?? DEFAULT_POS.requireConfirmOnCheckout,
+      enforceStock:            s.enforceStock            ?? DEFAULT_POS.enforceStock,
     };
     hydrate(biz, p);
     setBizForm(biz);
@@ -308,7 +309,7 @@ export default function ConfigContent() {
                 </div>
               </div>
 
-              <div className="config-setting-row" style={{ borderBottom: "none" }}>
+              <div className="config-setting-row">
                 <div>
                   <div className="config-setting-label">Confirmar antes de cobrar</div>
                   <div className="config-setting-hint">
@@ -325,6 +326,23 @@ export default function ConfigContent() {
                   }
                   aria-pressed={posForm.requireConfirmOnCheckout}
                   aria-label="Confirmar antes de cobrar"
+                />
+              </div>
+
+              <div className="config-setting-row" style={{ borderBottom: "none" }}>
+                <div>
+                  <div className="config-setting-label">Control de stock</div>
+                  <div className="config-setting-hint">
+                    Activo: bloquea ventas si no hay suficiente stock. Inactivo: vende libremente sin validar cantidad.
+                  </div>
+                </div>
+                <button
+                  className={`config-toggle${posForm.enforceStock ? " config-toggle--on" : ""}`}
+                  onClick={() =>
+                    setPosForm((f) => ({ ...f, enforceStock: !f.enforceStock }))
+                  }
+                  aria-pressed={posForm.enforceStock}
+                  aria-label="Control de stock"
                 />
               </div>
 

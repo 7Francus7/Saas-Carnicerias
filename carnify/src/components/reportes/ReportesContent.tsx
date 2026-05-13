@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingBag,
   Receipt, BarChart3, Download, ArrowUpRight,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer,
+  CartesianGrid, Tooltip,
   PieChart, Pie, Cell,
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
@@ -45,14 +45,57 @@ function PaymentTooltip({ active, payload, label }: { active?: boolean; payload?
   );
 }
 
+function MeasuredChart({
+  height,
+  children,
+}: {
+  height: number;
+  children: (size: { width: number; height: number }) => React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const updateWidth = (nextWidth: number) => {
+      const roundedWidth = Math.round(nextWidth);
+      setWidth((prev) => (prev === roundedWidth ? prev : roundedWidth));
+    };
+
+    updateWidth(element.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      updateWidth(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="chart-container" style={{ height }}>
+      {width > 0 && children({ width, height })}
+    </div>
+  );
+}
+
 export default function ReportesContent() {
   const [period, setPeriod] = useState<Period>("hoy");
   const [customDate, setCustomDate] = useState("");
   const [data, setData] = useState<AggregatedReportData | null>(null);
+  const [chartsReady, setChartsReady] = useState(false);
 
   useEffect(() => {
     getAggregatedReportData(period, customDate || undefined).then(setData);
   }, [period, customDate]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setChartsReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const reportData = data ?? {
     current: { ventas: 0, tx: 0, avgTicket: 0, margen: 0 },
@@ -210,23 +253,25 @@ export default function ReportesContent() {
             </div>
             <BarChart3 size={16} style={{ color: "var(--text-muted)" }} />
           </div>
-          <div className="chart-container">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={reportData.timeline} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#DC2626" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="#DC2626" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-                <XAxis dataKey="t" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border-light)" }} tickLine={false} />
-                <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                <Tooltip content={<PaymentTooltip />} />
-                <Area type="monotone" dataKey="v" stroke="#DC2626" strokeWidth={2.5} fill="url(#rGrad)" dot={false} activeDot={{ r: 5, stroke: "#DC2626", strokeWidth: 2, fill: "var(--bg-card)" }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {chartsReady && (
+            <MeasuredChart height={280}>
+              {({ width, height }) => (
+                <AreaChart width={width} height={height} data={reportData.timeline} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="rGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#DC2626" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#DC2626" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="t" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border-light)" }} tickLine={false} />
+                  <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<PaymentTooltip />} />
+                  <Area type="monotone" dataKey="v" stroke="#DC2626" strokeWidth={2.5} fill="url(#rGrad)" dot={false} activeDot={{ r: 5, stroke: "#DC2626", strokeWidth: 2, fill: "var(--bg-card)" }} />
+                </AreaChart>
+              )}
+            </MeasuredChart>
+          )}
         </div>
 
         <div className="card animate-in animate-in-delay-3">
@@ -236,21 +281,23 @@ export default function ReportesContent() {
               <div className="card__subtitle">Distribucion del periodo</div>
             </div>
           </div>
-          <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={currentPaymentData.length > 0 ? currentPaymentData : [{ method: "Sin ventas", amount: 1, pct: 100, color: "var(--border-light)" }]}
-                  cx="50%" cy="50%" innerRadius={45} outerRadius={68}
-                  paddingAngle={currentPaymentData.length > 0 ? 3 : 0} dataKey="amount"
-                >
-                  {(currentPaymentData.length > 0 ? currentPaymentData : [{ method: "Sin ventas", amount: 1, pct: 100, color: "var(--border-light)" }]).map((entry, idx) => (
-                    <Cell key={idx} fill={entry.color} stroke="transparent" />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {chartsReady && (
+            <MeasuredChart height={160}>
+              {({ width, height }) => (
+                <PieChart width={width} height={height}>
+                  <Pie
+                    data={currentPaymentData.length > 0 ? currentPaymentData : [{ method: "Sin ventas", amount: 1, pct: 100, color: "var(--border-light)" }]}
+                    cx="50%" cy="50%" innerRadius={45} outerRadius={68}
+                    paddingAngle={currentPaymentData.length > 0 ? 3 : 0} dataKey="amount"
+                  >
+                    {(currentPaymentData.length > 0 ? currentPaymentData : [{ method: "Sin ventas", amount: 1, pct: 100, color: "var(--border-light)" }]).map((entry, idx) => (
+                      <Cell key={idx} fill={entry.color} stroke="transparent" />
+                    ))}
+                  </Pie>
+                </PieChart>
+              )}
+            </MeasuredChart>
+          )}
           <div className="donut-legend">
             {currentPaymentData.length === 0 ? (
               <div className="donut-legend-item">

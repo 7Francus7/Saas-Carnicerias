@@ -156,10 +156,12 @@ export async function recordSale(
     throw new Error("La suma de los medios de pago no coincide con el total");
   }
 
-  const session = await prisma.cajaSession.findFirst({
-    where: { organizationId: tenantId, closedAt: null },
-  });
+  const [session, settings] = await Promise.all([
+    prisma.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
+    prisma.businessSettings.findUnique({ where: { organizationId: tenantId }, select: { enforceStock: true } }),
+  ]);
   if (!session) throw new Error("No hay caja abierta");
+  const enforceStock = settings?.enforceStock ?? true;
 
   const method = parsedSplits.length > 1 ? "mixed" : parsedSplits[0]?.method ?? "cash";
   const fiadoAmount = parsedSplits
@@ -238,31 +240,28 @@ export async function recordSale(
           where: { productId: item.productId },
         });
 
-        if (!existingInventory || existingInventory.quantity < item.quantity) {
-          const available = existingInventory?.quantity ?? 0;
-          throw new Error(
-            `Stock insuficiente para ${item.name}. Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory?.unit ?? item.unit}.`
-          );
+        if (enforceStock && existingInventory) {
+          if (existingInventory.quantity < item.quantity) {
+            throw new Error(
+              `Stock insuficiente para ${item.name}. Disponible: ${existingInventory.quantity.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory.unit}.`
+            );
+          }
+          await tx.inventoryItem.update({
+            where: { productId: item.productId },
+            data: { quantity: { decrement: item.quantity }, unit: item.unit },
+          });
+          await tx.stockMovement.create({
+            data: {
+              organizationId: tenantId,
+              type: "sale",
+              productId: item.productId,
+              productName: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              note: `Venta #${newSale.id.slice(-6)}`,
+            },
+          });
         }
-
-        await tx.inventoryItem.update({
-          where: { productId: item.productId },
-          data: {
-            quantity: { decrement: item.quantity },
-            unit: item.unit,
-          },
-        });
-        await tx.stockMovement.create({
-          data: {
-            organizationId: tenantId,
-            type: "sale",
-            productId: item.productId,
-            productName: item.name,
-            quantity: item.quantity,
-            unit: item.unit,
-            note: `Venta #${newSale.id.slice(-6)}`,
-          },
-        });
       }
     }
 

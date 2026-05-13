@@ -22,6 +22,7 @@ export async function getPosRuntimeSettings() {
       defaultPaymentMethod: true,
       stockAlertThreshold: true,
       requireConfirmOnCheckout: true,
+      enforceStock: true,
     },
   });
 }
@@ -46,6 +47,7 @@ export async function updateSettings(data: {
   defaultPaymentMethod?: string;
   stockAlertThreshold?: number;
   requireConfirmOnCheckout?: boolean;
+  enforceStock?: boolean;
 }) {
   const { tenantId } = await requireTenantAndSection("config");
   await prisma.businessSettings.upsert({

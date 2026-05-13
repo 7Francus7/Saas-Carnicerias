@@ -199,7 +199,7 @@ export default function Sidebar() {
                     <span className={`sidebar__link-icon-wrap${isActive ? " sidebar__link-icon-wrap--active" : ""}`}>
                       {Icon && <Icon size={16} />}
                     </span>
-                    <span>{item.label}</span>
+                    <span className="sidebar__link-text">{item.label}</span>
                     <span className="sidebar__link-right">
                       {item.badge && <span className="sidebar__badge">{item.badge}</span>}
                       {isActive && <ChevronRight size={12} className="sidebar__chevron" />}
@@ -220,7 +220,7 @@ export default function Sidebar() {
             <span className="sidebar__link-icon-wrap">
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </span>
-            <span>{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
+            <span className="sidebar__link-text">{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
           </button>
 
           <div className="sidebar__user">

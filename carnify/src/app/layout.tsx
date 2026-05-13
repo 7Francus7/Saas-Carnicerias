@@ -25,13 +25,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const enableVercelTelemetry = process.env.VERCEL === "1";
+
   return (
     <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ThemeProvider>
           {children}
-          <Analytics />
-          <SpeedInsights />
+          {enableVercelTelemetry && (
+            <>
+              <Analytics />
+              <SpeedInsights />
+            </>
+          )}
         </ThemeProvider>
       </body>
     </html>

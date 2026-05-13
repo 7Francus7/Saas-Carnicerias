@@ -105,6 +105,7 @@ export default function POSContent() {
   const [posSettings, setPosSettings] = useState<PosSettings>(DEFAULT_POS);
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [weightValue, setWeightValue] = useState("");
+  const [cartOpen, setCartOpen] = useState(false);
 
   function getEffectivePrice(p: Product): number {
     if (p.discountPercent && p.discountPercent > 0) {
@@ -153,6 +154,8 @@ export default function POSContent() {
           settings.stockAlertThreshold ?? DEFAULT_POS.stockAlertThreshold,
         requireConfirmOnCheckout:
           settings.requireConfirmOnCheckout ?? DEFAULT_POS.requireConfirmOnCheckout,
+        enforceStock:
+          settings.enforceStock ?? DEFAULT_POS.enforceStock,
       });
     });
     getInventoryForPos().then((rows) => {
@@ -181,13 +184,14 @@ export default function POSContent() {
   }, [inventoryByProduct, reservedQuantityByProduct]);
 
   const validateStockAvailability = useCallback((product: Product, requestedQuantity: number) => {
+    if (!posSettings.enforceStock) return null;
     const available = getAvailableStock(product.id);
     if (available === null) return null;
     if (available < requestedQuantity) {
       return `Stock insuficiente para ${product.name}. Disponible: ${Math.max(0, available).toFixed(product.unit === "kg" ? 3 : 0)} ${product.unit}.`;
     }
     return null;
-  }, [getAvailableStock]);
+  }, [getAvailableStock, posSettings.enforceStock]);
 
   // ── Barcode scanner buffer ─────────────────────────────────────────────
   const scanBuffer = useRef("");
@@ -435,8 +439,11 @@ export default function POSContent() {
       setShowCheckoutModal(false);
       setShowSuccessModal(true);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : "";
       setCheckoutError(
-        error instanceof Error ? error.message : "No se pudo registrar la venta."
+        msg && !msg.includes("Server Components render")
+          ? msg
+          : "No se pudo registrar la venta. Intentá de nuevo."
       );
     }
   };
@@ -595,8 +602,25 @@ export default function POSContent() {
         </div>
       </div>
 
+      {/* ── Tablet cart toggle ── */}
+      <div
+        className={`pos-cart-backdrop${cartOpen ? " pos-cart-backdrop--visible" : ""}`}
+        onClick={() => setCartOpen(false)}
+      />
+      <button
+        className="pos-cart-toggle"
+        onClick={() => setCartOpen((o) => !o)}
+        aria-label="Abrir carrito"
+      >
+        <ShoppingCart size={18} />
+        Carrito
+        {cart.length > 0 && (
+          <span className="pos-cart-toggle__badge">{cart.length}</span>
+        )}
+      </button>
+
       {/* ── Right: Cart ── */}
-      <div className="pos-sidebar">
+      <div className={`pos-sidebar${cartOpen ? " pos-sidebar--open" : ""}`}>
         <div className="pos-cart">
           <div className="pos-cart__header">
             <div className="pos-cart__title">

@@ -29,9 +29,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, string> = {
   owner:   "var(--primary)",
-  admin:   "#8B5CF6",
-  cashier: "#3B82F6",
-  viewer:  "#71717A",
+  admin:   "var(--info)",
+  cashier: "var(--info)",
+  viewer:  "var(--text-muted)",
 };
 
 const EMPTY_FORM = {
@@ -511,9 +511,9 @@ function MemberCard({
               title="Ver como este empleado"
               style={{
                 height: 32, padding: "0 10px", borderRadius: 8,
-                border: "1px solid rgba(245,158,11,0.4)",
-                background: "rgba(245,158,11,0.08)", cursor: "pointer", display: "flex",
-                alignItems: "center", gap: 5, color: "#F59E0B", fontSize: 12, fontWeight: 600,
+                border: "1px solid var(--warning-border)",
+                background: "var(--warning-soft)", cursor: "pointer", display: "flex",
+                alignItems: "center", gap: 5, color: "var(--warning)", fontSize: 12, fontWeight: 600,
               }}
             >
               <MonitorPlay size={13} />

@@ -209,7 +209,7 @@ export default function InventoryContent() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-card__icon" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#ef4444" }}><ArrowUpRight size={20} /></div>
+          <div className="stat-card__icon stat-card__icon--danger"><ArrowUpRight size={20} /></div>
           <div className="stat-card__content">
             <span className="stat-card__label">Salidas del Mes</span>
             <span className="stat-card__value">{formatNumber(Math.round(currentMonthOut * 10) / 10)} kg/un</span>
@@ -269,7 +269,7 @@ export default function InventoryContent() {
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: item.quantity <= 0 ? "var(--danger)" : item.quantity <= stockAlertThreshold ? "#f59e0b" : "var(--success)" }}>
+                      <td style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: item.quantity <= 0 ? "var(--danger)" : item.quantity <= stockAlertThreshold ? "var(--warning)" : "var(--success)" }}>
                         {formatNumber(item.quantity)} {item.unit}
                       </td>
                       <td>{item.unit}</td>
@@ -445,9 +445,10 @@ export default function InventoryContent() {
         .inventory-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px; }
         .stat-card { background: var(--bg-card); border: 1px solid var(--border-light); padding: 24px; border-radius: var(--radius-lg); display: flex; align-items: center; gap: 20px; }
         .stat-card__icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        .stat-card__icon--blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .stat-card__icon--orange { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .stat-card__icon--green { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+        .stat-card__icon--blue { background: var(--info-soft); color: var(--info); }
+        .stat-card__icon--orange { background: var(--warning-soft); color: var(--warning); }
+        .stat-card__icon--green { background: var(--success-soft); color: var(--success); }
+        .stat-card__icon--danger { background: var(--danger-soft); color: var(--danger); }
         .stat-card__label { display: block; font-size: 0.85rem; color: var(--text-tertiary); margin-bottom: 4px; }
         .stat-card__value { display: block; font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); }
         .inventory-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border-light); margin-bottom: 24px; }
@@ -469,13 +470,13 @@ export default function InventoryContent() {
         .movement-list { display: flex; flex-direction: column; gap: 12px; }
         .movement-card { background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: var(--radius-md); display: flex; gap: 20px; align-items: center; }
         .movement-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        .movement-icon--entry { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
-        .movement-icon--exit { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .movement-icon--entry { background: var(--success-soft); color: var(--success); }
+        .movement-icon--exit { background: var(--danger-soft); color: var(--danger); }
         .movement-details { flex: 1; }
         .movement-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
         .movement-product { font-weight: 700; color: var(--text-primary); }
         .movement-qty { font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; }
-        .movement-qty--entry { color: #22c55e; }
+        .movement-qty--entry { color: var(--success); }
         .movement-qty--exit { color: var(--danger); }
         .movement-meta { color: var(--text-tertiary); font-size: 0.75rem; display: flex; align-items: center; gap: 5px; }
         .movement-note { margin-top: 8px; font-size: 0.85rem; color: var(--text-muted); background: var(--bg-secondary); padding: 8px 12px; border-radius: 6px; border-left: 3px solid var(--border-light); }
