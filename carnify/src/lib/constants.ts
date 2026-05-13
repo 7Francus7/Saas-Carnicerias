@@ -116,16 +116,20 @@ export const PAYMENT_METHODS = [
   { id: 'fiado', label: 'Cuenta Cte.', icon: 'UserPlus', color: '#EF4444' },
 ];
 
-// ── Formatters ──
+// ── Formatters (singleton Intl instances) ──
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "ARS",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const numberFormatter = new Intl.NumberFormat("es-AR");
+
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+  return currencyFormatter.format(value);
 }
 
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat("es-AR").format(value);
+  return numberFormatter.format(value);
 }

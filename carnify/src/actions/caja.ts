@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { startOfDay, addDays, getARTHour, getARTDayOfWeek } from "@/lib/dateUtils";
 
 const SplitSchema = z.object({ method: z.string(), amount: z.number() });
 const CartItemSchema = z.object({
@@ -20,45 +21,43 @@ export async function getCurrentSession() {
   return prisma.cajaSession.findFirst({
     where: { organizationId: tenantId, closedAt: null },
     include: {
-      sales: {
-        include: {
-          splits: true,
-          items: {
-            include: {
-              product: {
-                select: { id: true, name: true, category: true, emoji: true, unit: true },
-              },
-            },
-          },
-        },
-      },
+      sales: { include: { splits: true } },
       transactions: true,
     },
     orderBy: { openedAt: "desc" },
   });
 }
 
-export async function getSessionHistory(limit = 365) {
+export async function getSessionHistory(limit = 30) {
   const { tenantId } = await requireTenantAndSection("caja");
   return prisma.cajaSession.findMany({
     where: { organizationId: tenantId, closedAt: { not: null } },
+    include: {
+      sales: { include: { splits: true } },
+      transactions: true,
+    },
+    orderBy: { openedAt: "desc" },
+    take: limit,
+  });
+}
+
+export async function getSessionDetail(id: string) {
+  const { tenantId } = await requireTenantAndSection("caja");
+  return prisma.cajaSession.findFirst({
+    where: { id, organizationId: tenantId },
     include: {
       sales: {
         include: {
           splits: true,
           items: {
             include: {
-              product: {
-                select: { id: true, name: true, category: true, emoji: true, unit: true },
-              },
+              product: { select: { id: true, name: true, category: true, emoji: true, unit: true } },
             },
           },
         },
       },
       transactions: true,
     },
-    orderBy: { openedAt: "desc" },
-    take: limit,
   });
 }
 
@@ -82,7 +81,10 @@ export async function closeCaja(realAmounts: Record<string, number>) {
 
   const session = await prisma.cajaSession.findFirst({
     where: { organizationId: tenantId, closedAt: null },
-    include: { sales: { include: { splits: true } }, transactions: true },
+    include: {
+      sales: { where: { status: "active" }, include: { splits: true } },
+      transactions: true,
+    },
   });
   if (!session) throw new Error("No hay caja abierta");
 
@@ -205,28 +207,29 @@ export async function recordSale(
       const client = await tx.client.findFirst({
         where: { id: clientId, organizationId: tenantId },
       });
-      if (client) {
-        const newBalance = client.balance + fiadoAmount;
-        await tx.clientMovement.create({
-          data: {
-            clientId,
-            date: new Date(),
-            type: "sale",
-            amount: fiadoAmount,
-            balanceAfter: newBalance,
-            description: `Venta #${newSale.id.slice(-6)}`,
-            ticketId: newSale.id,
-          },
-        });
-        await tx.client.update({
-          where: { id: clientId },
-          data: {
-            balance: newBalance,
-            status: newBalance > client.creditLimit ? "overdue" : "active",
-            lastActivity: new Date(),
-          },
-        });
+      if (!client) {
+        throw new Error("El cliente seleccionado no existe o fue eliminado. Cancelá la venta y seleccioná un cliente válido.");
       }
+      const newBalance = client.balance + fiadoAmount;
+      await tx.clientMovement.create({
+        data: {
+          clientId,
+          date: new Date(),
+          type: "sale",
+          amount: fiadoAmount,
+          balanceAfter: newBalance,
+          description: `Venta #${newSale.id.slice(-6)}`,
+          ticketId: newSale.id,
+        },
+      });
+      await tx.client.update({
+        where: { id: clientId },
+        data: {
+          balance: newBalance,
+          status: newBalance > client.creditLimit ? "overdue" : "active",
+          lastActivity: new Date(),
+        },
+      });
     }
 
     for (const item of parsedItems) {
@@ -235,21 +238,16 @@ export async function recordSale(
           where: { productId: item.productId },
         });
 
-        if (existingInventory && existingInventory.quantity < item.quantity) {
+        if (!existingInventory || existingInventory.quantity < item.quantity) {
+          const available = existingInventory?.quantity ?? 0;
           throw new Error(
-            `Stock insuficiente para ${item.name}. Disponible: ${existingInventory.quantity} ${existingInventory.unit}.`
+            `Stock insuficiente para ${item.name}. Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory?.unit ?? item.unit}.`
           );
         }
 
-        await tx.inventoryItem.upsert({
+        await tx.inventoryItem.update({
           where: { productId: item.productId },
-          create: {
-            organizationId: tenantId,
-            productId: item.productId,
-            quantity: -item.quantity,
-            unit: item.unit,
-          },
-          update: {
+          data: {
             quantity: { decrement: item.quantity },
             unit: item.unit,
           },
@@ -281,8 +279,8 @@ export async function recordSale(
 export async function getDashboardStats() {
   const { tenantId } = await requireTenantAndSection("dashboard");
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 86400000);
+  const todayStart = startOfDay(now);
+  const todayEnd = addDays(todayStart, 1);
 
   const sessions = await prisma.cajaSession.findMany({
     where: {
@@ -290,7 +288,7 @@ export async function getDashboardStats() {
       closedAt: null,
     },
     include: {
-      sales: { include: { splits: true, items: true } },
+      sales: { where: { status: "active" }, include: { splits: true } },
       transactions: true,
     },
     orderBy: { openedAt: "desc" },
@@ -303,7 +301,7 @@ export async function getDashboardStats() {
       closedAt: { gte: todayStart, lt: todayEnd },
     },
     include: {
-      sales: { include: { splits: true, items: true } },
+      sales: { where: { status: "active" }, include: { splits: true } },
     },
   });
 
@@ -314,14 +312,18 @@ export async function getDashboardStats() {
   const hourlyMap: Record<string, number> = {};
   const paymentMap: Record<string, number> = {};
 
-  const processSales = (sales: typeof sessions[0]['sales'], baseDate: Date) => {
+  const processSales = (sales: typeof sessions[0]['sales']) => {
     for (const sale of sales) {
+      // Filter by actual sale timestamp — prevents showing yesterday's sales if caja was left open
+      const ts = new Date(sale.timestamp);
+      if (ts < todayStart || ts >= todayEnd) continue;
+
       totalRevenue += sale.total;
       totalOrders += 1;
       totalItems += sale.itemCount;
       if (sale.clientId) clientIds.add(sale.clientId);
 
-      const h = new Date(sale.timestamp).getHours().toString().padStart(2, "0") + ":00";
+      const h = getARTHour(ts).toString().padStart(2, "0") + ":00";
       hourlyMap[h] = (hourlyMap[h] ?? 0) + sale.total;
 
       if (sale.splits.length > 0) {
@@ -333,31 +335,32 @@ export async function getDashboardStats() {
   };
 
   const activeSession = sessions[0] ?? null;
-  if (activeSession) processSales(activeSession.sales, activeSession.openedAt);
-  for (const s of closedToday) processSales(s.sales, s.openedAt);
+  if (activeSession) processSales(activeSession.sales);
+  for (const s of closedToday) processSales(s.sales);
 
   // Weekly data (last 7 days)
-  const weekStart = new Date(todayStart);
-  weekStart.setDate(weekStart.getDate() - 6);
+  const weekStart = addDays(todayStart, -6);
   const weekSessions = await prisma.cajaSession.findMany({
     where: {
       organizationId: tenantId,
       openedAt: { gte: weekStart },
     },
-    include: { sales: true },
+    include: { sales: { where: { status: "active" } } },
   });
 
   const dayMap: Record<string, number> = {};
   const dayLabels = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    dayMap[dayLabels[d.getDay()]] = 0;
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const dayEnd = new Date(dayStart.getTime() + 86400000);
+    const dayStart = addDays(weekStart, i);
+    const dayEnd = addDays(dayStart, 1);
+    const dow = getARTDayOfWeek(dayStart);
+    dayMap[dayLabels[dow]] = 0;
     for (const s of weekSessions) {
-      if (s.openedAt >= dayStart && s.openedAt < dayEnd) {
-        for (const sale of s.sales) dayMap[dayLabels[d.getDay()]] += sale.total;
+      for (const sale of s.sales) {
+        const saleTs = new Date(sale.timestamp);
+        if (saleTs >= dayStart && saleTs < dayEnd) {
+          dayMap[dayLabels[dow]] += sale.total;
+        }
       }
     }
   }
@@ -401,6 +404,7 @@ export async function getSalesForPeriod(start: Date, end: Date) {
     where: {
       session: { organizationId: tenantId },
       timestamp: { gte: start, lte: end },
+      status: "active",
     },
     include: {
       items: true,
@@ -417,6 +421,7 @@ export async function getSalesWithMargins(start: Date, end: Date) {
     where: {
       session: { organizationId: tenantId },
       timestamp: { gte: start, lte: end },
+      status: "active",
     },
     include: {
       items: { where: { productId: { not: null } } },
@@ -472,6 +477,7 @@ export async function getSalesByProduct(start: Date, end: Date) {
       sale: {
         session: { organizationId: tenantId },
         timestamp: { gte: start, lte: end },
+        status: "active",
       },
     },
     include: { product: { select: { id: true, name: true, emoji: true, category: true } } },
@@ -508,6 +514,97 @@ export async function getSalesByProduct(start: Date, end: Date) {
   }
 
   return Array.from(grouped.values()).sort((a, b) => b.revenue - a.revenue);
+}
+
+export async function cancelSale(saleId: string, reason: string) {
+  const { tenantId, userId } = await requireTenantAndSection("caja");
+
+  if (!reason?.trim()) throw new Error("El motivo de anulación es obligatorio");
+
+  await prisma.$transaction(async (tx) => {
+    // Load sale with all related data, verify tenant ownership via session
+    const sale = await tx.sale.findFirst({
+      where: {
+        id: saleId,
+        session: { organizationId: tenantId, closedAt: null },
+      },
+      include: {
+        splits: true,
+        items: true,
+        session: { select: { id: true, organizationId: true } },
+      },
+    });
+
+    if (!sale) throw new Error("Venta no encontrada, no pertenece a esta organización, o la sesión ya fue cerrada");
+    if (sale.status === "cancelled") throw new Error("Esta venta ya fue anulada");
+
+    // Mark sale as cancelled
+    await tx.sale.update({
+      where: { id: saleId },
+      data: {
+        status: "cancelled",
+        cancelledAt: new Date(),
+        cancelledById: userId,
+        cancelReason: reason.trim(),
+      },
+    });
+
+    // Restore stock for each item that has a productId
+    for (const item of sale.items) {
+      if (!item.productId) continue;
+
+      await tx.inventoryItem.update({
+        where: { productId: item.productId },
+        data: { quantity: { increment: item.quantity } },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          organizationId: tenantId,
+          type: "cancellation",
+          productId: item.productId,
+          productName: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          note: `Anulación venta #${saleId.slice(-6)} — ${reason.trim()}`,
+        },
+      });
+    }
+
+    // Revert fiado debt if applicable
+    const fiadoSplit = sale.splits.find((s) => s.method === "fiado");
+    if (fiadoSplit && sale.clientId) {
+      const client = await tx.client.findUnique({ where: { id: sale.clientId } });
+      if (client) {
+        const newBalance = client.balance - fiadoSplit.amount;
+        await tx.clientMovement.create({
+          data: {
+            clientId: sale.clientId,
+            date: new Date(),
+            type: "cancellation",
+            amount: -fiadoSplit.amount,
+            balanceAfter: newBalance,
+            description: `Anulación venta #${saleId.slice(-6)} — ${reason.trim()}`,
+            ticketId: saleId,
+          },
+        });
+        await tx.client.update({
+          where: { id: sale.clientId },
+          data: {
+            balance: newBalance,
+            status: newBalance > client.creditLimit ? "overdue" : "active",
+            lastActivity: new Date(),
+          },
+        });
+      }
+    }
+
+  });
+
+  revalidatePath("/caja");
+  revalidatePath("/inventario");
+  revalidatePath("/reportes");
+  revalidatePath("/clientes");
 }
 
 export async function addCashTransaction(type: "in" | "out", amount: number, reason: string) {

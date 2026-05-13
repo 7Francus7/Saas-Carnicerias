@@ -94,6 +94,30 @@ export default function OnboardingPage() {
             </button>
           </form>
         </div>
+
+        <div style={{
+          borderTop: "1px solid var(--border)",
+          padding: "20px 24px",
+          background: "var(--surface-2)",
+          borderRadius: "0 0 12px 12px",
+        }}>
+          <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>
+            Primeros pasos sugeridos
+          </p>
+          <ol style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { step: "Cargá tus productos con precios actualizados", section: "Productos" },
+              { step: "Abrí la caja del día con el efectivo inicial", section: "Caja" },
+              { step: "Registrá tus primeras ventas en el punto de venta", section: "POS" },
+              { step: "Revisá el resumen diario en Reportes al cierre", section: "Reportes" },
+            ].map(({ step, section }) => (
+              <li key={section} style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                {step}{" "}
+                <span style={{ color: "var(--primary)", fontWeight: 600 }}>→ {section}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );

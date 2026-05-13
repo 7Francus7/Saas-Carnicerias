@@ -11,6 +11,7 @@ export interface CajaVenta {
   total: number;
   method: string;
   itemCount: number;
+  status: string;
   splits?: PaymentSplit[];
   clientId?: string;
   clientName?: string;
@@ -54,6 +55,7 @@ interface DbSale {
   total: number;
   method: string;
   itemCount: number;
+  status?: string | null;
   splits?: DbSplit[];
   clientId?: string | null;
   clientName?: string | null;
@@ -92,6 +94,7 @@ export function mapDbSessionToStore(s: DbCajaSession): CajaSession {
       total: v.total,
       method: v.method,
       itemCount: v.itemCount,
+      status: v.status ?? "active",
       splits: v.splits && v.splits.length > 1
         ? v.splits.map((sp) => ({ method: sp.method, amount: sp.amount }))
         : undefined,

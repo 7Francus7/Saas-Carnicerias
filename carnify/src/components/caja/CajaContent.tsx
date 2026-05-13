@@ -6,6 +6,7 @@ import {
   X, DollarSign, CreditCard, Smartphone, UserPlus,
   Calculator, QrCode, TrendingUp,
   Clock, AlertTriangle, Check, History, Loader2,
+  Ban, ShoppingCart,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
@@ -15,6 +16,7 @@ import {
   openCaja as dbOpenCaja,
   closeCaja as dbCloseCaja,
   addCashTransaction,
+  cancelSale as dbCancelSale,
 } from "@/actions/caja";
 
 const METHODS = [
@@ -36,7 +38,8 @@ function fmtDate(iso: string) {
 
 // ── History row ───────────────────────────────────────────────────────────────
 function HistoryRow({ s }: { s: import("@/stores/useCajaStore").CajaSession }) {
-  const sTotal    = s.ventas.reduce((a, v) => a + v.total, 0);
+  const activeVentas = s.ventas.filter((v) => v.status !== "cancelled");
+  const sTotal = activeVentas.reduce((a, v) => a + v.total, 0);
 
   const hasDiff = s.diffAmount !== undefined;
   const diffCls = !hasDiff ? "" :
@@ -53,11 +56,16 @@ function HistoryRow({ s }: { s: import("@/stores/useCajaStore").CajaSession }) {
           {s.closedAt ? fmtDate(s.closedAt) : fmtDate(s.openedAt)}
         </div>
         <div style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>
-          {fmtTime(s.openedAt)} → {s.closedAt ? fmtTime(s.closedAt) : "Aún abierta"} · {s.ventas.length} ventas · Fondo {formatCurrency(s.startingCash)}
+          {fmtTime(s.openedAt)} → {s.closedAt ? fmtTime(s.closedAt) : "Aún abierta"} · {activeVentas.length} ventas · Fondo {formatCurrency(s.startingCash)}
         </div>
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: "0.88rem" }}>{formatCurrency(sTotal)}</div>
+        {s.ventas.some((v) => v.status === "cancelled") && (
+          <div style={{ fontSize: "0.68rem", color: "var(--danger)" }}>
+            {s.ventas.filter((v) => v.status === "cancelled").length} anulada(s)
+          </div>
+        )}
         {s.realAmounts?.["cash"] !== undefined && (
           <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Efectivo {formatCurrency(s.realAmounts["cash"])}</div>
         )}
@@ -77,7 +85,8 @@ export default function CajaContent() {
   const [closingCaja, setClosingCaja] = useState(false);
 
   const isOpen       = currentSession !== null;
-  const ventas = useMemo(() => currentSession?.ventas ?? [], [currentSession]);
+  const allVentas = useMemo(() => currentSession?.ventas ?? [], [currentSession]);
+  const ventas = useMemo(() => allVentas.filter((v) => v.status !== "cancelled"), [allVentas]);
   const transactions = useMemo(() => currentSession?.transactions ?? [], [currentSession]);
   const startingCash = currentSession?.startingCash ?? 0;
   const openedAt     = currentSession?.openedAt;
@@ -135,6 +144,32 @@ export default function CajaContent() {
   const [arqueoReal,  setArqueoReal]  = useState("");
   const [closeAmounts, setCloseAmounts] = useState<Record<string, string>>({});
   const [showHistory, setShowHistory] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<import("@/stores/useCajaStore").CajaVenta | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelDone, setCancelDone] = useState(false);
+
+  async function handleCancelSale() {
+    if (!cancelTarget) return;
+    if (!cancelReason.trim()) { setCancelError("El motivo es obligatorio."); return; }
+    setCancelError(null);
+    setCancellingId(cancelTarget.id);
+    try {
+      await dbCancelSale(cancelTarget.id, cancelReason.trim());
+      setCancelDone(true);
+      await loadData();
+      setTimeout(() => {
+        setCancelTarget(null);
+        setCancelReason("");
+        setCancelDone(false);
+      }, 1400);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "No se pudo anular la venta.");
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   const realVal       = parseFloat(arqueoReal.replace(",", ".")) || 0;
   const diff          = arqueoReal !== "" ? realVal - efectivoTeorico : null;
@@ -447,8 +482,71 @@ export default function CajaContent() {
             </div>
           </div>
 
+          {/* Ventas de la sesión con anulación */}
+          <div className="card animate-in animate-in-delay-2">
+            <div className="card__header">
+              <div>
+                <div className="card__title">Ventas de esta sesión</div>
+                <div className="card__subtitle">{allVentas.length} registros · {ventas.length} activas</div>
+              </div>
+              <ShoppingCart size={16} style={{ color: "var(--text-muted)" }} />
+            </div>
+            {allVentas.length === 0 ? (
+              <div className="empty-state" style={{ padding: "24px 0" }}>
+                <div className="empty-state__title">Sin ventas aún</div>
+                <div className="empty-state__desc">Las ventas aparecerán aquí en tiempo real.</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {allVentas.slice().reverse().map((v) => {
+                  const isCancelled = v.status === "cancelled";
+                  return (
+                    <div
+                      key={v.id}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        padding: "8px 10px", borderRadius: "var(--radius-sm)",
+                        background: isCancelled ? "var(--danger-soft)" : "var(--bg-elevated)",
+                        opacity: isCancelled ? 0.65 : 1,
+                        border: "1px solid " + (isCancelled ? "var(--danger-border)" : "var(--border-light)"),
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: "0.82rem", fontWeight: 600, color: isCancelled ? "var(--danger)" : "var(--text-primary)" }}>
+                            {isCancelled && <Ban size={12} style={{ display: "inline", marginRight: 4 }} />}
+                            {formatCurrency(v.total)}
+                          </span>
+                          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", background: "var(--surface)", borderRadius: 4, padding: "1px 6px" }}>
+                            {v.method === "mixed" ? "Mixto" : v.method === "cash" ? "Efectivo" : v.method === "fiado" ? "Fiado" : v.method === "transfer" ? "Transferencia" : v.method === "card" ? "Tarjeta" : v.method}
+                          </span>
+                          {v.clientName && (
+                            <span style={{ fontSize: "0.7rem", color: "var(--text-tertiary)" }}>{v.clientName}</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: 1 }}>
+                          {fmtTime(v.timestamp)} · {v.itemCount} ítem{v.itemCount !== 1 ? "s" : ""}
+                          {isCancelled && " · ANULADA"}
+                        </div>
+                      </div>
+                      {!isCancelled && (
+                        <button
+                          className="btn btn--sm"
+                          style={{ background: "var(--danger-soft)", color: "var(--danger)", border: "1px solid var(--danger-border)", flexShrink: 0, fontSize: "0.72rem", padding: "4px 10px" }}
+                          onClick={() => { setCancelTarget(v); setCancelReason(""); setCancelError(null); setCancelDone(false); }}
+                        >
+                          <Ban size={12} /> Anular
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Quick link to reports */}
-          <div className="card animate-in animate-in-delay-2" style={{ background: "var(--primary-soft)", border: "1px solid var(--primary-border)" }}>
+          <div className="card animate-in animate-in-delay-3" style={{ background: "var(--primary-soft)", border: "1px solid var(--primary-border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px" }}>
               <div style={{ padding: 12, borderRadius: 12, background: "var(--primary)", color: "white" }}>
                 <TrendingUp size={24} />
@@ -833,6 +931,100 @@ export default function CajaContent() {
 
       {/* ── Modal: Historial ── */}
       {showHistory && <HistoryModal history={history} onClose={() => setShowHistory(false)} />}
+
+      {/* ── Modal: Anular Venta ── */}
+      {cancelTarget && (
+        <div className="modal-overlay" onClick={() => !cancellingId && !cancelDone && setCancelTarget(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", background: "var(--danger-soft)", color: "var(--danger)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Ban size={16} />
+                </div>
+                <h3 className="modal__title" style={{ marginBottom: 0 }}>Anular Venta</h3>
+              </div>
+              <button className="modal__close" onClick={() => !cancellingId && !cancelDone && setCancelTarget(null)}><X size={18} /></button>
+            </div>
+            <div className="modal__content">
+              {/* Warning */}
+              <div style={{ padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--warning-soft)", border: "1px solid var(--warning-border)", display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 20 }}>
+                <AlertTriangle size={16} style={{ color: "var(--warning)", flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                  <strong>Esta acción no se puede deshacer.</strong> La venta quedará marcada como anulada. Se revertirá el stock, la deuda del cliente (si aplica) y se registrará un movimiento compensatorio en caja.
+                </div>
+              </div>
+
+              {/* Sale summary */}
+              <div style={{ background: "var(--bg-elevated)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", padding: "12px 14px", marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", marginBottom: 4 }}>
+                  <span style={{ color: "var(--text-tertiary)" }}>Total</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{formatCurrency(cancelTarget.total)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", marginBottom: 4 }}>
+                  <span style={{ color: "var(--text-tertiary)" }}>Hora</span>
+                  <span>{fmtTime(cancelTarget.timestamp)}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem", marginBottom: cancelTarget.clientName ? 4 : 0 }}>
+                  <span style={{ color: "var(--text-tertiary)" }}>Pago</span>
+                  <span>{cancelTarget.method === "mixed" ? "Mixto" : cancelTarget.method === "cash" ? "Efectivo" : cancelTarget.method === "fiado" ? "Fiado" : cancelTarget.method === "transfer" ? "Transferencia" : cancelTarget.method}</span>
+                </div>
+                {cancelTarget.clientName && (
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.82rem" }}>
+                    <span style={{ color: "var(--text-tertiary)" }}>Cliente</span>
+                    <span>{cancelTarget.clientName}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Reason */}
+              <div className="form-group" style={{ marginBottom: 20 }}>
+                <label className="form-label">Motivo de anulación <span style={{ color: "var(--danger)" }}>*</span></label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Ej: Error en precio, pedido cancelado por el cliente..."
+                  value={cancelReason}
+                  onChange={(e) => { setCancelReason(e.target.value); setCancelError(null); }}
+                  autoFocus
+                  disabled={!!cancellingId || cancelDone}
+                />
+              </div>
+
+              {cancelDone && (
+                <div className="arqueo-diff arqueo-diff--ok" style={{ marginBottom: 14 }}>
+                  <span><Check size={14} /> Venta anulada correctamente</span>
+                </div>
+              )}
+
+              {cancelError && (
+                <div className="arqueo-diff arqueo-diff--under" style={{ marginBottom: 14 }}>
+                  <span>{cancelError}</span>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setCancelTarget(null)}
+                  disabled={!!cancellingId || cancelDone}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={handleCancelSale}
+                  disabled={!!cancellingId || cancelDone || !cancelReason.trim()}
+                >
+                  {cancellingId ? <Loader2 size={15} className="animate-spin" /> : <Ban size={15} />}
+                  Anular venta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

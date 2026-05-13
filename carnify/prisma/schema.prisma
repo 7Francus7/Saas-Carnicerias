@@ -213,25 +213,31 @@ model CajaSession {
   sales          Sale[]
   transactions   CashTransaction[]
 
+  @@index([organizationId, openedAt])
   @@map("caja_session")
 }
 
 model Sale {
-  id         String             @id @default(cuid())
-  sessionId  String
-  session    CajaSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  timestamp  DateTime           @default(now())
-  total      Float
-  method     String
-  itemCount  Int
-  clientId   String?
-  client     Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  clientName String?
-  splits     SalePaymentSplit[]
-  items      SaleItem[]
+  id             String             @id @default(cuid())
+  sessionId      String
+  session        CajaSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp      DateTime           @default(now())
+  total          Float
+  method         String
+  itemCount      Int
+  clientId       String?
+  client         Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientName     String?
+  status         String             @default("active")
+  cancelledAt    DateTime?
+  cancelledById  String?
+  cancelReason   String?
+  splits         SalePaymentSplit[]
+  items          SaleItem[]
 
   @@index([sessionId, timestamp])
   @@index([clientId])
+  @@index([sessionId, status])
   @@map("sale")
 }
 
@@ -258,6 +264,7 @@ model SaleItem {
   unit      String
   emoji     String?
 
+  @@index([saleId])
   @@map("sale_item")
 }
 
@@ -272,6 +279,7 @@ model CashTransaction {
   reason         String
   timestamp      DateTime     @default(now())
 
+  @@index([sessionId])
   @@map("cash_transaction")
 }
 
@@ -313,6 +321,7 @@ model ClientMovement {
   ticketId      String?
   paymentMethod String?
 
+  @@index([clientId, date])
   @@map("client_movement")
 }
 

@@ -4,17 +4,17 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 
 const DEFAULT_PRODUCTS = [
-  { plu: "001", name: "Carne Molida", category: "Vacuno", emoji: "🥩", price: 2500, unit: "kg" as const },
-  { plu: "002", name: "Bife Ancho", category: "Vacuno", emoji: "🥩", price: 3200, unit: "kg" as const },
-  { plu: "003", name: "Costilla", category: "Vacuno", emoji: "🥩", price: 1800, unit: "kg" as const },
-  { plu: "004", name: "Chorizo", category: "Embutidos", emoji: "🌭", price: 2200, unit: "kg" as const },
-  { plu: "005", name: "Morcilla", category: "Embutidos", emoji: "🌭", price: 1900, unit: "kg" as const },
-  { plu: "006", name: "Salchicha", category: "Embutidos", emoji: "🌭", price: 1500, unit: "kg" as const },
-  { plu: "007", name: "Pollo Entero", category: "Pollo", emoji: "🍗", price: 1400, unit: "kg" as const },
-  { plu: "008", name: "Pechuga", category: "Pollo", emoji: "🍗", price: 1800, unit: "kg" as const },
-  { plu: "009", name: "Alas", category: "Pollo", emoji: "🍗", price: 900, unit: "kg" as const },
-  { plu: "010", name: "Patas", category: "Pollo", emoji: "🍗", price: 600, unit: "kg" as const },
-  { plu: "011", name: "Hueso", category: "Pollo", emoji: "🍗", price: 400, unit: "kg" as const },
+  { plu: "001", name: "Carne molida",        category: "vacuno",    emoji: "🥩", price: 7500,  unit: "kg" as const },
+  { plu: "002", name: "Vacío",               category: "vacuno",    emoji: "🥩", price: 9500,  unit: "kg" as const },
+  { plu: "003", name: "Asado",               category: "vacuno",    emoji: "🥩", price: 8500,  unit: "kg" as const },
+  { plu: "004", name: "Paleta",              category: "vacuno",    emoji: "🥩", price: 6800,  unit: "kg" as const },
+  { plu: "005", name: "Chorizo parrillero",  category: "embutidos", emoji: "🌭", price: 5800,  unit: "kg" as const },
+  { plu: "006", name: "Morcilla",            category: "embutidos", emoji: "🌭", price: 4200,  unit: "kg" as const },
+  { plu: "007", name: "Salchicha",           category: "embutidos", emoji: "🌭", price: 3900,  unit: "kg" as const },
+  { plu: "008", name: "Pollo entero",        category: "pollo",     emoji: "🍗", price: 3200,  unit: "kg" as const },
+  { plu: "009", name: "Muslos de pollo",     category: "pollo",     emoji: "🍗", price: 3800,  unit: "kg" as const },
+  { plu: "010", name: "Hamburguesas x4",     category: "elaborados",emoji: "🍔", price: 4500,  unit: "un" as const },
+  { plu: "011", name: "Milanesa de cerdo",   category: "elaborados",emoji: "🍖", price: 8900,  unit: "kg" as const },
 ];
 
 export async function POST(req: NextRequest) {

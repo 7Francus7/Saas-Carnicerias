@@ -20,8 +20,21 @@ export async function getClients() {
   const { tenantId } = await requireTenantAndSection("clientes");
   return prisma.client.findMany({
     where: { organizationId: tenantId },
-    include: { movements: { orderBy: { date: "desc" } }, periods: { orderBy: { closedAt: "desc" } } },
+    include: {
+      movements: { orderBy: { date: "desc" }, take: 100 },
+      periods: { orderBy: { closedAt: "desc" } },
+    },
     orderBy: { name: "asc" },
+  });
+}
+
+export async function getClientMovements(clientId: string, offset = 0, limit = 50) {
+  const { tenantId } = await requireTenantAndSection("clientes");
+  return prisma.clientMovement.findMany({
+    where: { clientId, client: { organizationId: tenantId } },
+    orderBy: { date: "desc" },
+    skip: offset,
+    take: limit,
   });
 }
 
@@ -65,6 +78,13 @@ export async function updateClient(id: string, data: Partial<z.infer<typeof Clie
 
 export async function deleteClient(id: string) {
   const { tenantId } = await requireTenantAndSection("clientes");
+  const client = await prisma.client.findFirst({ where: { id, organizationId: tenantId } });
+  if (!client) return;
+  if (client.balance > 0) {
+    throw new Error(
+      `Este cliente tiene deuda pendiente de $${client.balance.toFixed(2)}. Saldá la cuenta antes de eliminar.`
+    );
+  }
   await prisma.client.deleteMany({ where: { id, organizationId: tenantId } });
   revalidatePath("/clientes");
 }
@@ -76,15 +96,21 @@ export async function addPayment(
   method: string,
 ) {
   const { tenantId } = await requireTenantAndSection("clientes");
-  const client = await prisma.client.findFirst({
-    where: { id: clientId, organizationId: tenantId },
-  });
-  if (!client) throw new Error("Cliente no encontrado");
 
-  const newBalance = Math.max(0, client.balance - amount);
+  const movement = await prisma.$transaction(async (tx) => {
+    // Read balance inside transaction to prevent race condition
+    const client = await tx.client.findFirst({
+      where: { id: clientId, organizationId: tenantId },
+    });
+    if (!client) throw new Error("Cliente no encontrado");
 
-  const [movement] = await prisma.$transaction([
-    prisma.clientMovement.create({
+    // Allow saldo a favor (negative balance = credit)
+    const newBalance = client.balance - amount;
+    const newStatus = newBalance <= 0 ? "active"
+      : newBalance <= client.creditLimit ? "active"
+      : "overdue";
+
+    const mov = await tx.clientMovement.create({
       data: {
         clientId,
         date: new Date(),
@@ -94,16 +120,19 @@ export async function addPayment(
         description: note || "Pago",
         paymentMethod: method,
       },
-    }),
-    prisma.client.update({
+    });
+
+    await tx.client.update({
       where: { id: clientId },
       data: {
         balance: newBalance,
-        status: newBalance === 0 ? "active" : client.status,
+        status: newStatus,
         lastActivity: new Date(),
       },
-    }),
-  ]);
+    });
+
+    return mov;
+  });
 
   revalidatePath("/clientes");
   return movement;
@@ -111,15 +140,16 @@ export async function addPayment(
 
 export async function addSaleToAccount(clientId: string, amount: number, description: string) {
   const { tenantId } = await requireTenantAndSection("clientes");
-  const client = await prisma.client.findFirst({
-    where: { id: clientId, organizationId: tenantId },
-  });
-  if (!client) throw new Error("Cliente no encontrado");
 
-  const newBalance = client.balance + amount;
+  await prisma.$transaction(async (tx) => {
+    const client = await tx.client.findFirst({
+      where: { id: clientId, organizationId: tenantId },
+    });
+    if (!client) throw new Error("Cliente no encontrado");
 
-  await prisma.$transaction([
-    prisma.clientMovement.create({
+    const newBalance = client.balance + amount;
+
+    await tx.clientMovement.create({
       data: {
         clientId,
         date: new Date(),
@@ -128,61 +158,75 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
         balanceAfter: newBalance,
         description,
       },
-    }),
-    prisma.client.update({
+    });
+
+    await tx.client.update({
       where: { id: clientId },
       data: {
         balance: newBalance,
         status: newBalance > client.creditLimit ? "overdue" : "active",
         lastActivity: new Date(),
       },
-    }),
-  ]);
+    });
+  });
 
   revalidatePath("/clientes");
 }
 
 export async function closePeriod(clientId: string, reason: "settled" | "month_end" | "manual") {
   const { tenantId } = await requireTenantAndSection("clientes");
-  const client = await prisma.client.findFirst({
-    where: { id: clientId, organizationId: tenantId },
-    include: { movements: { where: { periodId: null } } },
-  });
-  if (!client) throw new Error("Cliente no encontrado");
 
-  const now = new Date();
-  const label = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
-  const totalSales = client.movements
-    .filter((m: { type: string }) => m.type === "sale")
-    .reduce((a: number, m: { amount: number }) => a + m.amount, 0);
-  const totalPaid = client.movements
-    .filter((m: { type: string }) => m.type === "payment")
-    .reduce((a: number, m: { amount: number }) => a + m.amount, 0);
-
-  const period = await prisma.clientPeriod.create({
-    data: {
-      clientId,
-      label,
-      openedAt: client.createdAt,
-      closedAt: now,
-      closedReason: reason,
-      totalSales,
-      totalPaid,
-      finalBalance: client.balance,
-    },
-  });
-
-  await prisma.clientMovement.updateMany({
-    where: { clientId, periodId: null },
-    data: { periodId: period.id },
-  });
-
-  if (reason === "settled") {
-    await prisma.client.update({
-      where: { id: clientId },
-      data: { balance: 0, status: "active" },
+  await prisma.$transaction(async (tx) => {
+    const client = await tx.client.findFirst({
+      where: { id: clientId, organizationId: tenantId },
+      include: {
+        movements: {
+          where: { periodId: null },
+          orderBy: { date: "asc" },
+        },
+      },
     });
-  }
+    if (!client) throw new Error("Cliente no encontrado");
+    if (client.movements.length === 0) throw new Error("No hay movimientos pendientes para cerrar");
+
+    const now = new Date();
+    const label = now.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+
+    const totalSales = client.movements
+      .filter((m) => m.type === "sale" || m.type === "cancellation")
+      .reduce((a, m) => a + m.amount, 0);
+    const totalPaid = client.movements
+      .filter((m) => m.type === "payment")
+      .reduce((a, m) => a + m.amount, 0);
+
+    // Use date of first unassigned movement, not client creation date
+    const periodOpenedAt = new Date(client.movements[0].date);
+
+    const period = await tx.clientPeriod.create({
+      data: {
+        clientId,
+        label,
+        openedAt: periodOpenedAt,
+        closedAt: now,
+        closedReason: reason,
+        totalSales,
+        totalPaid,
+        finalBalance: client.balance,
+      },
+    });
+
+    await tx.clientMovement.updateMany({
+      where: { clientId, periodId: null },
+      data: { periodId: period.id },
+    });
+
+    if (reason === "settled") {
+      await tx.client.update({
+        where: { id: clientId },
+        data: { balance: 0, status: "active" },
+      });
+    }
+  });
 
   revalidatePath("/clientes");
 }

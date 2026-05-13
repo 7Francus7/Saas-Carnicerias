@@ -23,6 +23,14 @@ export async function getProducts() {
   const { tenantId } = await requireTenantAndSection("productos");
   return prisma.product.findMany({
     where: { organizationId: tenantId },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getProductsWithCost() {
+  const { tenantId } = await requireTenantAndSection("productos");
+  return prisma.product.findMany({
+    where: { organizationId: tenantId },
     include: { cost: true },
     orderBy: { name: "asc" },
   });

@@ -83,6 +83,14 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
   const total = parsed.items.reduce((acc, i) => acc + i.unitCost * i.quantity, 0);
 
   const purchase = await prisma.$transaction(async (tx) => {
+    // Load product names upfront to avoid using IDs as names in stock movements
+    const productIds = parsed.items.map((i) => i.productId);
+    const dbProducts = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true },
+    });
+    const productNameMap = new Map(dbProducts.map((p) => [p.id, p.name]));
+
     const p = await tx.purchase.create({
       data: {
         organizationId: tenantId,
@@ -125,7 +133,7 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
           organizationId: tenantId,
           type: "entry",
           productId: item.productId,
-          productName: item.productId,
+          productName: productNameMap.get(item.productId) ?? item.productId,
           quantity: item.quantity,
           unit: item.unit,
           supplier: parsed.supplierId,
@@ -149,8 +157,62 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
   return purchase;
 }
 
-export async function deletePurchase(id: string) {
+export async function cancelPurchase(id: string) {
   const { tenantId } = await requireTenantAndSection("compras");
-  await prisma.purchase.deleteMany({ where: { id, organizationId: tenantId } });
+
+  await prisma.$transaction(async (tx) => {
+    const purchase = await tx.purchase.findFirst({
+      where: { id, organizationId: tenantId },
+      include: {
+        items: {
+          include: { product: { select: { id: true, name: true } } },
+        },
+      },
+    });
+    if (!purchase) throw new Error("Compra no encontrada");
+    if (purchase.status === "cancelled") throw new Error("La compra ya está cancelada");
+
+    for (const item of purchase.items) {
+      const inv = await tx.inventoryItem.findUnique({ where: { productId: item.productId } });
+      const available = inv?.quantity ?? 0;
+      if (available < item.quantity) {
+        throw new Error(
+          `No se puede cancelar esta compra: el stock de "${item.product.name}" ya fue consumido o vendido. ` +
+          `Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${item.unit}, ` +
+          `requerido para revertir: ${item.quantity.toFixed(item.unit === "kg" ? 3 : 0)} ${item.unit}.`
+        );
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          organizationId: tenantId,
+          type: "exit",
+          productId: item.productId,
+          productName: item.product.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          note: `Anulación compra #${purchase.id.slice(-6)}`,
+        },
+      });
+
+      await tx.inventoryItem.update({
+        where: { productId: item.productId },
+        data: { quantity: { decrement: item.quantity } },
+      });
+    }
+
+    await tx.purchase.update({
+      where: { id },
+      data: { status: "cancelled" },
+    });
+  });
+
   revalidatePath("/compras");
+  revalidatePath("/inventario");
+  revalidatePath("/costos");
+}
+
+// UI calls deletePurchase — now routes through cancelPurchase for safe reversal
+export async function deletePurchase(id: string) {
+  return cancelPurchase(id);
 }

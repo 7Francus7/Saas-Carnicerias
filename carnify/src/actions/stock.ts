@@ -96,9 +96,10 @@ export async function addStockMovement(data: z.infer<typeof MovementSchema>) {
         where: { productId: parsed.productId },
       });
 
-      if (sign < 0 && existingInventory && existingInventory.quantity < parsed.quantity) {
+      if (sign < 0 && (!existingInventory || existingInventory.quantity < parsed.quantity)) {
+        const available = existingInventory?.quantity ?? 0;
         throw new Error(
-          `Stock insuficiente para ${parsed.productName}. Disponible: ${existingInventory.quantity} ${existingInventory.unit}.`
+          `Stock insuficiente para ${parsed.productName}. Disponible: ${available.toFixed(parsed.unit === "kg" ? 3 : 0)} ${existingInventory?.unit ?? parsed.unit}.`
         );
       }
 

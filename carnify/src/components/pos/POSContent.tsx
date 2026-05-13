@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES, PAYMENT_METHODS,
-  formatCurrency, formatNumber,
+  formatCurrency,
 } from "@/lib/constants";
 import { usePOSStore } from "@/stores/usePOSStore";
 import { useProductsStore } from "@/stores/useProductsStore";
@@ -20,6 +20,7 @@ import { getClientsForPos } from "@/actions/clients";
 import { getPosRuntimeSettings } from "@/actions/settings";
 import { getInventoryForPos } from "@/actions/stock";
 import { DEFAULT_POS, type PosSettings } from "@/stores/useSettingsStore";
+import { ProductCard } from "./ProductCard";
 
 // ── Barcode parsing ─────────────────────────────────────────────────────────
 // Scale EAN-13 format: 2 [PLU 5 digits] [weight in grams 5 digits] [check digit]
@@ -107,6 +108,10 @@ export default function POSContent() {
 
   function getEffectivePrice(p: Product): number {
     if (p.discountPercent && p.discountPercent > 0) {
+      if (p.discountEndDate) {
+        const end = new Date(p.discountEndDate);
+        if (end < new Date()) return p.price; // Expired — no discount
+      }
       return p.price * (1 - p.discountPercent / 100);
     }
     return p.price;
@@ -239,6 +244,23 @@ export default function POSContent() {
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Refs for unstable values used in keydown handler (avoid listener re-registration)
+  const searchRef = useRef(search);
+  const pluMapRef = useRef(pluMap);
+  const processScanRef = useRef(processScan);
+  const validateStockRef = useRef(validateStockAvailability);
+  const showWeightModalRef = useRef(showWeightModal);
+  const showCheckoutModalRef = useRef(showCheckoutModal);
+  const showSuccessModalRef = useRef(showSuccessModal);
+
+  searchRef.current = search;
+  pluMapRef.current = pluMap;
+  processScanRef.current = processScan;
+  validateStockRef.current = validateStockAvailability;
+  showWeightModalRef.current = showWeightModal;
+  showCheckoutModalRef.current = showCheckoutModal;
+  showSuccessModalRef.current = showSuccessModal;
+
   // Global keydown listener — barcode scanners + keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -262,9 +284,9 @@ export default function POSContent() {
 
       // Escape: Close any open modal
       if (e.key === "Escape") {
-        if (showWeightModal) { setShowWeightModal(false); return; }
-        if (showCheckoutModal) { setShowCheckoutModal(false); return; }
-        if (showSuccessModal) { clearCart(); setShowSuccessModal(false); return; }
+        if (showWeightModalRef.current) { setShowWeightModal(false); return; }
+        if (showCheckoutModalRef.current) { setShowCheckoutModal(false); return; }
+        if (showSuccessModalRef.current) { clearCart(); setShowSuccessModal(false); return; }
         return;
       }
 
@@ -272,13 +294,13 @@ export default function POSContent() {
       if ((tag === "INPUT" || tag === "TEXTAREA") && !isSearchInput) return;
 
       if (e.key === "Enter") {
-        // If search has content, first try as PLU lookup
-        if (search) {
-          const padded = search.trim().padStart(5, "0");
-          const bySearchPlu = pluMap.get(padded);
+        const currentSearch = searchRef.current;
+        if (currentSearch) {
+          const padded = currentSearch.trim().padStart(5, "0");
+          const bySearchPlu = pluMapRef.current.get(padded);
           if (bySearchPlu) {
             if (bySearchPlu.unit === "un") {
-              const stockError = validateStockAvailability(bySearchPlu, 1);
+              const stockError = validateStockRef.current(bySearchPlu, 1);
               if (!stockError) {
                 addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: bySearchPlu.price, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
                 setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: bySearchPlu.price });
@@ -291,7 +313,7 @@ export default function POSContent() {
         }
 
         if (scanBuffer.current.length >= 6) {
-          processScan(scanBuffer.current);
+          processScanRef.current(scanBuffer.current);
         }
         scanBuffer.current = "";
         if (scanTimer.current) clearTimeout(scanTimer.current);
@@ -308,7 +330,7 @@ export default function POSContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [processScan, search, pluMap, addToCart, createCartItemId, validateStockAvailability, showWeightModal, showCheckoutModal, showSuccessModal]);
+  }, []);
 
   // ── Product helpers ──────────────────────────────────────────────────────
   const filteredProducts = products.filter((p) => {
@@ -344,7 +366,7 @@ export default function POSContent() {
         setTimeout(() => setScanResult(null), 3000);
         return;
       }
-      addToCart({ id: createCartItemId(activeProduct.id), productId: activeProduct.id, name: activeProduct.name, price: activeProduct.price, quantity: weight, unit: "kg", emoji: activeProduct.emoji });
+      addToCart({ id: createCartItemId(activeProduct.id), productId: activeProduct.id, name: activeProduct.name, price: getEffectivePrice(activeProduct), quantity: weight, unit: "kg", emoji: activeProduct.emoji });
       setShowWeightModal(false);
     }
   };
@@ -554,59 +576,22 @@ export default function POSContent() {
         </div>
 
         <div className="pos-grid">
-          {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              className="pos-card"
-              onClick={() => handleProductClick(product)}
-              style={
-                getAvailableStock(product.id) !== null && getAvailableStock(product.id)! <= 0
-                  ? { opacity: 0.6, cursor: "not-allowed" }
-                  : undefined
-              }
-            >
-              <div className="pos-card__emoji-wrap">
-                <div className="pos-card__emoji">{product.emoji}</div>
-              </div>
-              <div className="pos-card__name">{product.name}</div>
-              <div className="pos-card__price">
-                {product.discountPercent && product.discountPercent > 0 ? (
-                  <>
-                    <span style={{ textDecoration: "line-through", color: "#999", marginRight: 6, fontSize: "0.78rem" }}>
-                      {formatCurrency(product.price)}
-                    </span>
-                    <span style={{ color: "#dc2626", fontWeight: 800 }}>
-                      {formatCurrency(product.price * (1 - product.discountPercent / 100))}
-                    </span>
-                  </>
-                ) : (
-                  formatCurrency(product.price)
-                )}
-                <span className="pos-card__unit">/{product.unit}</span>
-              </div>
-              {product.discountPercent && product.discountPercent > 0 && (
-                <div className="pos-card__promo">{product.discountPercent}% OFF</div>
-              )}
-              <div className="pos-card__plu">PLU {product.plu}</div>
-              {getAvailableStock(product.id) !== null && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    color:
-                      getAvailableStock(product.id)! <= 0
-                        ? "var(--danger)"
-                        : getAvailableStock(product.id)! <= posSettings.stockAlertThreshold
-                          ? "#f59e0b"
-                          : "var(--success)",
-                  }}
-                >
-                  Stock: {formatNumber(Math.max(0, getAvailableStock(product.id)!))} {inventoryByProduct[product.id]?.unit ?? product.unit}
-                </div>
-              )}
-            </div>
-          ))}
+          {filteredProducts.map((product) => {
+            const stock = getAvailableStock(product.id);
+            const effectivePrice = getEffectivePrice(product);
+            return (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isOutOfStock={stock !== null && stock <= 0}
+                availableStock={stock}
+                stockUnit={inventoryByProduct[product.id]?.unit ?? product.unit}
+                stockAlertThreshold={posSettings.stockAlertThreshold}
+                discountPrice={effectivePrice !== product.price ? effectivePrice : null}
+                onClick={() => handleProductClick(product)}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -621,7 +606,15 @@ export default function POSContent() {
                 <span className="pos-cart__count">{cart.length}</span>
               )}
             </div>
-            <button className="pos-cart__clear" onClick={clearCart}>
+            <button
+              className="pos-cart__clear"
+              onClick={() => {
+                if (cart.length === 0) return;
+                if (window.confirm(`¿Seguro que querés vaciar el carrito? Se perderán ${cart.length} ítem(s).`)) {
+                  clearCart();
+                }
+              }}
+            >
               Vaciar
             </button>
           </div>
@@ -698,7 +691,7 @@ export default function POSContent() {
                 <span className="weight-product-info__emoji">{activeProduct.emoji}</span>
                 <div>
                   <h3 className="modal__title">{activeProduct.name}</h3>
-                  <span className="weight-product-info__subtext">{formatCurrency(activeProduct.price)} / kg</span>
+                  <span className="weight-product-info__subtext">{formatCurrency(getEffectivePrice(activeProduct))} / kg</span>
                 </div>
               </div>
               <button className="modal__close" onClick={() => setShowWeightModal(false)}>
@@ -721,7 +714,7 @@ export default function POSContent() {
                     <span className="weight-screen__unit">kg</span>
                   </div>
                   <div className="weight-screen__total">
-                    {formatCurrency((parseFloat(weightValue.replace(",", ".")) || 0) * activeProduct.price)}
+                    {formatCurrency((parseFloat(weightValue.replace(",", ".")) || 0) * getEffectivePrice(activeProduct))}
                   </div>
                 </div>
 
