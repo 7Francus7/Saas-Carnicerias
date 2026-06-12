@@ -58,11 +58,11 @@ export default function ClientFormModal({ mode, form, onChange, onSubmit, onClos
             <div className="form-group">
               <label className="form-label">Límite de crédito (opcional)</label>
               <input className="form-input" type="number" min={0}
-                placeholder="Sin límite por defecto"
-                value={form.creditLimit === 1000000 ? "" : form.creditLimit}
+                placeholder="Sin límite"
+                value={form.creditLimit === 0 ? "" : form.creditLimit}
                 onChange={(e) => {
                   const val = e.target.value;
-                  onChange({ ...form, creditLimit: val === "" ? 1000000 : parseFloat(val) || 0 });
+                  onChange({ ...form, creditLimit: val === "" ? 0 : parseFloat(val) || 0 });
                 }} />
             </div>
             {mode === "edit" && (

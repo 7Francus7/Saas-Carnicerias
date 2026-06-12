@@ -920,13 +920,13 @@ export default function POSContent() {
                       <div className="client-status-indicator">
                         <div className="client-status-indicator__row">
                           <span>Estado de cuenta:</span>
-                          <span style={{ color: selectedClient.balance > selectedClient.creditLimit ? "var(--danger)" : "var(--success)" }}>
-                            {selectedClient.balance > selectedClient.creditLimit ? "Excedido" : "Al día"}
+                          <span style={{ color: selectedClient.creditLimit > 0 && selectedClient.balance > selectedClient.creditLimit ? "var(--danger)" : "var(--success)" }}>
+                            {selectedClient.creditLimit > 0 && selectedClient.balance > selectedClient.creditLimit ? "Excedido" : "Al día"}
                           </span>
                         </div>
                         <div className="client-status-indicator__row">
                           <span>Saldo disponible:</span>
-                          <strong>{formatCurrency(Math.max(0, selectedClient.creditLimit - selectedClient.balance))}</strong>
+                          <strong>{selectedClient.creditLimit > 0 ? formatCurrency(Math.max(0, selectedClient.creditLimit - selectedClient.balance)) : "Sin límite"}</strong>
                         </div>
                       </div>
                     )}

@@ -105,7 +105,7 @@ export default function ClientProfilePanel({
             ) : (
               <>
                 <div className="summary-card__label">Saldo Deudor</div>
-                <div className={`summary-card__value ${client.balance > client.creditLimit ? "text-danger" : ""}`}>
+                <div className={`summary-card__value ${client.creditLimit > 0 && client.balance > client.creditLimit ? "text-danger" : ""}`}>
                   {formatCurrency(client.balance)}
                 </div>
               </>
@@ -116,14 +116,16 @@ export default function ClientProfilePanel({
           <div className="summary-card__icon"><CreditCard size={20} /></div>
           <div>
             <div className="summary-card__label">Límite Crédito</div>
-            <div className="summary-card__value">{formatCurrency(client.creditLimit)}</div>
+            <div className="summary-card__value">{client.creditLimit > 0 ? formatCurrency(client.creditLimit) : "Sin límite"}</div>
           </div>
         </div>
         <div className="summary-card summary-card--available">
           <div className="summary-card__icon"><CheckCircle2 size={20} /></div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="summary-card__label">Crédito Disponible</div>
-            {client.balance < 0 ? (
+            {client.creditLimit <= 0 ? (
+              <div className="summary-card__value text-success">Sin límite</div>
+            ) : client.balance < 0 ? (
               <>
                 <div className="summary-card__value text-success">
                   {formatCurrency(client.creditLimit + Math.abs(client.balance))}
@@ -141,11 +143,11 @@ export default function ClientProfilePanel({
                 <div className="credit-bar">
                   <div
                     className={`credit-bar__fill ${client.balance > client.creditLimit ? "credit-bar__fill--over" : ""}`}
-                    style={{ width: `${Math.min(100, client.creditLimit > 0 ? (client.balance / client.creditLimit) * 100 : 0)}%` }}
+                    style={{ width: `${Math.min(100, (client.balance / client.creditLimit) * 100)}%` }}
                   />
                 </div>
                 <div className="credit-bar__label">
-                  {client.creditLimit > 0 ? Math.min(100, Math.round((client.balance / client.creditLimit) * 100)) : 0}% usado
+                  {Math.min(100, Math.round((client.balance / client.creditLimit) * 100))}% usado
                 </div>
               </>
             )}

@@ -6,12 +6,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { startOfDay, addDays, getARTHour, getARTDayOfWeek } from "@/lib/dateUtils";
 
-const SplitSchema = z.object({ method: z.string(), amount: z.number() });
+const SplitSchema = z.object({ method: z.string(), amount: z.number().finite().nonnegative() });
 const CartItemSchema = z.object({
   productId: z.string().optional(),
-  name: z.string(),
-  price: z.number(),
-  quantity: z.number(),
+  name: z.string().min(1),
+  price: z.number().finite().nonnegative(),
+  quantity: z.number().finite().positive(),
   unit: z.string(),
   emoji: z.string().optional(),
 });
@@ -152,6 +152,7 @@ export async function recordSale(
   const parsedSplits = z.array(SplitSchema).parse(splits);
   const parsedItems = z.array(CartItemSchema).parse(items);
   if (parsedSplits.length === 0) throw new Error("La venta debe tener al menos un medio de pago");
+  if (parsedItems.length === 0) throw new Error("La venta debe tener al menos un producto");
 
   const totalInCents = Math.round(total * 100);
   const splitTotalInCents = Math.round(
@@ -160,6 +161,12 @@ export async function recordSale(
   if (Math.abs(totalInCents - splitTotalInCents) > 1) {
     throw new Error("La suma de los medios de pago no coincide con el total");
   }
+  const itemsTotalInCents = Math.round(
+    parsedItems.reduce((acc, item) => acc + item.price * item.quantity, 0) * 100
+  );
+  if (Math.abs(totalInCents - itemsTotalInCents) > 1) {
+    throw new Error("El total no coincide con los productos del carrito");
+  }
 
   const [session, settings] = await Promise.all([
     prisma.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
@@ -167,6 +174,34 @@ export async function recordSale(
   ]);
   if (!session) throw new Error("No hay caja abierta");
   const enforceStock = settings?.enforceStock ?? true;
+
+  // No confiar en precios del cliente: validar contra el precio vigente del producto
+  const productIds = [...new Set(parsedItems.flatMap((i) => (i.productId ? [i.productId] : [])))];
+  if (productIds.length > 0) {
+    const dbProducts = await prisma.product.findMany({
+      where: { id: { in: productIds }, organizationId: tenantId },
+      select: { id: true, price: true, discountPercent: true, discountEndDate: true },
+    });
+    const productById = new Map(dbProducts.map((p) => [p.id, p]));
+    const now = new Date();
+    for (const item of parsedItems) {
+      if (!item.productId) continue;
+      const product = productById.get(item.productId);
+      if (!product) {
+        throw new Error(`El producto ${item.name} ya no existe. Quitalo del carrito y volvé a intentar.`);
+      }
+      const discountActive =
+        product.discountPercent > 0 && (!product.discountEndDate || product.discountEndDate >= now);
+      const serverPrice = discountActive
+        ? product.price * (1 - product.discountPercent / 100)
+        : product.price;
+      if (Math.abs(item.price - serverPrice) > 0.01) {
+        throw new Error(
+          `El precio de ${item.name} cambió. Quitalo del carrito y volvé a agregarlo para tomar el precio vigente.`
+        );
+      }
+    }
+  }
 
   const method = parsedSplits.length > 1 ? "mixed" : parsedSplits[0]?.method ?? "cash";
   const fiadoAmount = parsedSplits
@@ -233,41 +268,43 @@ export async function recordSale(
         where: { id: clientId },
         data: {
           balance: newBalance,
-          status: newBalance > client.creditLimit ? "overdue" : "active",
+          status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
           lastActivity: new Date(),
         },
       });
     }
 
     for (const item of parsedItems) {
-      if (item.productId) {
-        const existingInventory = await tx.inventoryItem.findUnique({
-          where: { productId: item.productId },
-        });
+      if (!item.productId) continue;
 
-        if (enforceStock && existingInventory) {
-          if (existingInventory.quantity < item.quantity) {
-            throw new Error(
-              `Stock insuficiente para ${item.name}. Disponible: ${existingInventory.quantity.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory.unit}.`
-            );
-          }
-          await tx.inventoryItem.update({
-            where: { productId: item.productId },
-            data: { quantity: { decrement: item.quantity }, unit: item.unit },
-          });
-          await tx.stockMovement.create({
-            data: {
-              organizationId: tenantId,
-              type: "sale",
-              productId: item.productId,
-              productName: item.name,
-              quantity: item.quantity,
-              unit: item.unit,
-              note: `Venta #${newSale.id.slice(-6)}`,
-            },
-          });
+      const existingInventory = await tx.inventoryItem.findUnique({
+        where: { productId: item.productId },
+      });
+
+      if (existingInventory) {
+        if (enforceStock && existingInventory.quantity < item.quantity) {
+          throw new Error(
+            `Stock insuficiente para ${item.name}. Disponible: ${existingInventory.quantity.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory.unit}.`
+          );
         }
+        // Sin enforceStock se permite stock negativo, pero el inventario siempre refleja la venta
+        await tx.inventoryItem.update({
+          where: { productId: item.productId },
+          data: { quantity: { decrement: item.quantity }, unit: item.unit },
+        });
       }
+
+      await tx.stockMovement.create({
+        data: {
+          organizationId: tenantId,
+          type: "sale",
+          productId: item.productId,
+          productName: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          note: `Venta #${newSale.id.slice(-6)}`,
+        },
+      });
     }
 
     return newSale;
@@ -559,7 +596,8 @@ export async function cancelSale(saleId: string, reason: string) {
     for (const item of sale.items) {
       if (!item.productId) continue;
 
-      await tx.inventoryItem.update({
+      // updateMany: no falla si el producto no tiene item de inventario (venta registrada sin stock)
+      await tx.inventoryItem.updateMany({
         where: { productId: item.productId },
         data: { quantity: { increment: item.quantity } },
       });
@@ -598,7 +636,7 @@ export async function cancelSale(saleId: string, reason: string) {
           where: { id: sale.clientId },
           data: {
             balance: newBalance,
-            status: newBalance > client.creditLimit ? "overdue" : "active",
+            status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
             lastActivity: new Date(),
           },
         });

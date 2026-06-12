@@ -222,14 +222,14 @@ function SaleModal({ client, form, onChange, onSubmit, onClose, error, busy }: S
             <div>
               <div className="mini-name">{client.name}</div>
               <div className="mini-balance">
-                Disponible: <strong className={client.creditLimit - client.balance > 0 ? "text-success" : "text-danger"}>
-                  {formatCurrency(Math.max(0, client.creditLimit - client.balance))}
+                Disponible: <strong className={client.creditLimit <= 0 || client.creditLimit - client.balance > 0 ? "text-success" : "text-danger"}>
+                  {client.creditLimit > 0 ? formatCurrency(Math.max(0, client.creditLimit - client.balance)) : "Sin límite"}
                 </strong>
               </div>
             </div>
           </div>
 
-          {client.balance >= client.creditLimit && (
+          {client.creditLimit > 0 && client.balance >= client.creditLimit && (
             <div className="alert alert--warning">
               <AlertTriangle size={15} />
               <span>Este cliente ya superó su límite de crédito ({formatCurrency(client.creditLimit)}).</span>

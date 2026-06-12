@@ -106,8 +106,9 @@ export async function addPayment(
 
     // Allow saldo a favor (negative balance = credit)
     const newBalance = client.balance - amount;
+    // creditLimit 0 = sin límite
     const newStatus = newBalance <= 0 ? "active"
-      : newBalance <= client.creditLimit ? "active"
+      : client.creditLimit <= 0 || newBalance <= client.creditLimit ? "active"
       : "overdue";
 
     const mov = await tx.clientMovement.create({
@@ -164,7 +165,7 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
       where: { id: clientId },
       data: {
         balance: newBalance,
-        status: newBalance > client.creditLimit ? "overdue" : "active",
+        status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
         lastActivity: new Date(),
       },
     });

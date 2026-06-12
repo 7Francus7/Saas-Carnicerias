@@ -19,7 +19,7 @@ type FilterType = "all" | "debt" | "overdue";
 
 const EMPTY_FORM: ClientFormData = {
   name: "", dni: "", phone: "", address: "",
-  email: "", notes: "", creditLimit: 1000000, status: "active",
+  email: "", notes: "", creditLimit: 0, status: "active",
 };
 
 type DbClientMovement = {
