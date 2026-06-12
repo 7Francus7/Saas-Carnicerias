@@ -88,6 +88,7 @@ export default function ReportesContent() {
   const [customDate, setCustomDate] = useState("");
   const [data, setData] = useState<AggregatedReportData | null>(null);
   const [chartsReady, setChartsReady] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   useEffect(() => {
     getAggregatedReportData(period, customDate || undefined).then(setData);
@@ -108,7 +109,7 @@ export default function ReportesContent() {
   };
 
   const weeklyRows = useMemo(
-    () => reportData.weeklyByDay.map((d) => ({ ...d, tx: 0 })),
+    () => reportData.weeklyByDay,
     [reportData.weeklyByDay],
   );
 
@@ -349,9 +350,11 @@ export default function ReportesContent() {
               <div className="card__title">Productos Mas Vendidos</div>
               <div className="card__subtitle">Ranking del periodo</div>
             </div>
-            <button className="btn btn--ghost btn--sm">
-              Ver todos <ArrowUpRight size={13} />
-            </button>
+            {reportData.topProducts.length > 5 && (
+              <button className="btn btn--ghost btn--sm" onClick={() => setShowAllProducts((v) => !v)}>
+                {showAllProducts ? "Ver menos" : "Ver todos"} <ArrowUpRight size={13} />
+              </button>
+            )}
           </div>
           <div className="table-wrapper">
             <table className="data-table">
@@ -371,7 +374,7 @@ export default function ReportesContent() {
                       No hay ventas suficientes para armar el ranking en este periodo.
                     </td>
                   </tr>
-                ) : reportData.topProducts.map((product, idx) => (
+                ) : (showAllProducts ? reportData.topProducts : reportData.topProducts.slice(0, 5)).map((product, idx) => (
                   <tr key={`${product.name}_${idx}`}>
                     <td style={{ fontWeight: 700, color: idx < 3 ? "var(--primary)" : "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                       {idx + 1}

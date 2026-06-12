@@ -44,7 +44,7 @@ export default async function SuperAdminPage() {
     prisma.cajaSession.findMany({
       select: {
         organizationId: true,
-        sales: { select: { total: true } },
+        sales: { where: { status: "active" }, select: { total: true } },
       },
     }),
   ]);

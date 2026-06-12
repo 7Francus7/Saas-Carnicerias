@@ -15,18 +15,13 @@ export type AggregatedReportData = {
   paymentMap: Record<string, number>;
   categories: { name: string; emoji: string; v: number; color: string }[];
   topProducts: { name: string; emoji: string; cat: string; sold: number; unit: string; rev: number; margin: number }[];
-  weeklyByDay: { day: string; v: number; today: boolean }[];
+  weeklyByDay: { day: string; v: number; tx: number; today: boolean }[];
 };
 
 const CATEGORY_COLORS = [
   "#DC2626", "#F97316", "#16A34A", "#2563EB",
   "#A855F7", "#0F766E", "#D97706",
 ];
-
-function percentChange(current: number, previous: number) {
-  if (previous <= 0) return 0;
-  return parseFloat((((current - previous) / previous) * 100).toFixed(1));
-}
 
 function getDateRange(period: Period, customDate?: string) {
   const now = new Date();
@@ -256,7 +251,7 @@ export async function getAggregatedReportData(
   }
   const topProducts = [...productMap.values()]
     .sort((a, b) => b.rev - a.rev)
-    .slice(0, 5)
+    .slice(0, 20)
     .map((p) => ({
       name: p.name, emoji: p.emoji, cat: p.cat,
       sold: parseFloat(p.sold.toFixed(3)), unit: p.unit, rev: p.rev,
@@ -280,19 +275,18 @@ export async function getAggregatedReportData(
   };
 }
 
-function buildWeeklyByDay(sales: { total: number; timestamp: Date }[]): { day: string; v: number; today: boolean }[] {
+function buildWeeklyByDay(sales: { total: number; timestamp: Date }[]): { day: string; v: number; tx: number; today: boolean }[] {
   const now = new Date();
   return Array.from({ length: 7 }, (_, i) => {
     const day = addDays(startOfDay(now), i - 6);
     const nextDay = addDays(day, 1);
-    const v = sales
-      .filter((s) => s.timestamp >= day && s.timestamp < nextDay)
-      .reduce((a, s) => a + s.total, 0);
+    const daySales = sales.filter((s) => s.timestamp >= day && s.timestamp < nextDay);
+    const v = daySales.reduce((a, s) => a + s.total, 0);
     const isToday = day.toDateString() === startOfDay(now).toDateString();
     const label = isToday
       ? "Hoy"
       : day.toLocaleDateString("es-AR", { weekday: "short" }).replace(".", "");
-    return { day: label.charAt(0).toUpperCase() + label.slice(1), v, today: isToday };
+    return { day: label.charAt(0).toUpperCase() + label.slice(1), v, tx: daySales.length, today: isToday };
   });
 }
 

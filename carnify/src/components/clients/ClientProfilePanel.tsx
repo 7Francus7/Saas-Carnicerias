@@ -5,12 +5,12 @@ import {
   Hash, Phone, MapPin, Mail, Edit3, Trash2,
   ArrowDownLeft, ArrowUpRight, Wallet, CreditCard,
   CheckCircle2, TrendingUp, History, Archive,
-  Info, FileText, Download, AlertTriangle,
+  Info, FileText, Download,
   CheckCheck, ChevronDown, ChevronRight,
-  ShieldAlert, Package, StickyNote,
+  Package, StickyNote,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
-import type { ClientProfile, ClientMovement, ClientPeriod } from "@/stores/useClientStore";
+import type { ClientProfile } from "@/stores/useClientStore";
 
 const METHOD_LABELS: Record<string, string> = {
   cash: "Efectivo", transfer: "Transferencia", card: "Tarjeta", other: "Otro",

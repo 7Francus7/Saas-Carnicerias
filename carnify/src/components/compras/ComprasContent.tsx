@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Truck, Plus, Search, Building2, Calendar,
-  X, Loader2, Trash2, Package, DollarSign,
+  X, Loader2, Trash2, Package,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/constants";
 import {
@@ -37,6 +37,7 @@ export default function ComprasContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -57,27 +58,59 @@ export default function ComprasContent() {
 
   useEffect(() => { load(); }, []);
 
+  const errorMsg = (e: unknown, fallback: string) => {
+    const msg = e instanceof Error ? e.message : "";
+    return msg && !msg.includes("Server Components render") ? msg : fallback;
+  };
+
   const handleCreateSupplier = async () => {
+    setActionError(null);
     setSaving(true);
-    await createSupplier(supplierForm);
-    setShowSupplierModal(false);
-    setSupplierForm({ name: "", contactName: "", phone: "", email: "", address: "", cuit: "", notes: "" });
-    await load();
-    setSaving(false);
+    try {
+      await createSupplier(supplierForm);
+      setShowSupplierModal(false);
+      setSupplierForm({ name: "", contactName: "", phone: "", email: "", address: "", cuit: "", notes: "" });
+      await load();
+    } catch (e) {
+      setActionError(errorMsg(e, "No se pudo guardar el proveedor. Intentá de nuevo."));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCreatePurchase = async () => {
+    setActionError(null);
     setSaving(true);
-    await createPurchase(purchaseForm);
-    setShowPurchaseModal(false);
-    setPurchaseForm({ supplierId: "", paymentMethod: "cash", notes: "", items: [] });
-    await load();
-    setSaving(false);
+    try {
+      await createPurchase(purchaseForm);
+      setShowPurchaseModal(false);
+      setPurchaseForm({ supplierId: "", paymentMethod: "cash", notes: "", items: [] });
+      await load();
+    } catch (e) {
+      setActionError(errorMsg(e, "No se pudo registrar la compra. Intentá de nuevo."));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeletePurchase = async (id: string) => {
-    await deletePurchase(id);
-    await load();
+    setActionError(null);
+    try {
+      await deletePurchase(id);
+      await load();
+    } catch (e) {
+      setActionError(errorMsg(e, "No se pudo anular la compra."));
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    setActionError(null);
+    try {
+      await deleteSupplier(id);
+      await load();
+    } catch (e) {
+      setActionError(errorMsg(e, "No se pudo eliminar el proveedor."));
+    }
   };
 
   const addItemToPurchase = () => {
@@ -87,10 +120,11 @@ export default function ComprasContent() {
     }));
   };
 
-  const updatePurchaseItem = (idx: number, field: string, value: any) => {
+  type PurchaseFormItem = { productId: string; quantity: number; unit: string; unitCost: number };
+  const updatePurchaseItem = <K extends keyof PurchaseFormItem>(idx: number, field: K, value: PurchaseFormItem[K]) => {
     setPurchaseForm((prev) => {
       const items = [...prev.items];
-      (items[idx] as any)[field] = value;
+      items[idx] = { ...items[idx], [field]: value };
       return { ...prev, items };
     });
   };
@@ -158,14 +192,14 @@ export default function ComprasContent() {
         </div>
         <div className="page-header__right">
           <button
-            onClick={() => setShowSupplierModal(true)}
+            onClick={() => { setActionError(null); setShowSupplierModal(true); }}
             className="btn btn--ghost btn--sm"
             style={{ gap: 8 }}
           >
             <Building2 size={15} /> Proveedor
           </button>
           <button
-            onClick={() => setShowPurchaseModal(true)}
+            onClick={() => { setActionError(null); setShowPurchaseModal(true); }}
             className="btn btn--primary btn--sm"
             style={{ gap: 8 }}
           >
@@ -194,6 +228,19 @@ export default function ComprasContent() {
           }}
         />
       </div>
+
+      {/* Error banner (acciones sobre lista: anular compra, eliminar proveedor) */}
+      {actionError && !showSupplierModal && !showPurchaseModal && (
+        <div style={{
+          marginBottom: 20, padding: "12px 16px", borderRadius: "var(--radius-md)",
+          background: "var(--danger-soft)", border: "1px solid var(--danger-border)",
+          color: "var(--danger)", fontSize: "0.84rem", fontWeight: 600,
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <X size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{actionError}</span>
+        </div>
+      )}
 
       {/* Proveedores */}
       <section style={{ marginBottom: 32 }}>
@@ -227,7 +274,7 @@ export default function ComprasContent() {
                   </p>
                 </div>
                 <button
-                  onClick={() => deleteSupplier(s.id).then(load)}
+                  onClick={() => handleDeleteSupplier(s.id)}
                   style={{
                     background: "none", border: "none", cursor: "pointer",
                     color: "var(--text-muted)", padding: 6, borderRadius: "var(--radius-sm)",
@@ -351,24 +398,33 @@ export default function ComprasContent() {
               </button>
             </div>
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {[
+              {([
                 { placeholder: "Nombre *", field: "name" },
                 { placeholder: "Contacto", field: "contactName" },
                 { placeholder: "Teléfono", field: "phone" },
                 { placeholder: "Email", field: "email" },
                 { placeholder: "CUIT", field: "cuit" },
-              ].map(({ placeholder, field }) => (
+              ] as { placeholder: string; field: keyof typeof supplierForm }[]).map(({ placeholder, field }) => (
                 <input
                   key={field}
                   className={inputCls}
                   style={inputStyle}
                   placeholder={placeholder}
-                  value={(supplierForm as any)[field]}
+                  value={supplierForm[field]}
                   onChange={(e) => setSupplierForm({ ...supplierForm, [field]: e.target.value })}
                 />
               ))}
             </div>
             <div style={{ padding: "0 24px 20px" }}>
+              {actionError && (
+                <div style={{
+                  marginBottom: 12, padding: "10px 12px", borderRadius: "var(--radius-md)",
+                  background: "var(--danger-soft)", border: "1px solid var(--danger-border)",
+                  color: "var(--danger)", fontSize: "0.82rem", fontWeight: 600,
+                }}>
+                  {actionError}
+                </div>
+              )}
               <button
                 onClick={handleCreateSupplier}
                 disabled={saving || !supplierForm.name}
@@ -531,6 +587,15 @@ export default function ComprasContent() {
             </div>
 
             <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border-light)" }}>
+              {actionError && (
+                <div style={{
+                  marginBottom: 12, padding: "10px 12px", borderRadius: "var(--radius-md)",
+                  background: "var(--danger-soft)", border: "1px solid var(--danger-border)",
+                  color: "var(--danger)", fontSize: "0.82rem", fontWeight: 600,
+                }}>
+                  {actionError}
+                </div>
+              )}
               <button
                 onClick={handleCreatePurchase}
                 disabled={saving || !purchaseForm.supplierId || purchaseForm.items.length === 0 || purchaseForm.items.some((i) => !i.productId || i.unitCost <= 0)}

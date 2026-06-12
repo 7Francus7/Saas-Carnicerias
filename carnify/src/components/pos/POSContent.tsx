@@ -210,8 +210,9 @@ export default function POSContent() {
             setTimeout(() => setScanResult(null), 3000);
             return;
           }
-          addToCart({ id: createCartItemId(byPlu.id), productId: byPlu.id, name: byPlu.name, price: byPlu.price, quantity: 1, unit: "un", emoji: byPlu.emoji });
-          setScanResult({ ok: true, product: byPlu, weightKg: 1, total: byPlu.price });
+          const effectiveUnitPrice = getEffectivePrice(byPlu);
+          addToCart({ id: createCartItemId(byPlu.id), productId: byPlu.id, name: byPlu.name, price: effectiveUnitPrice, quantity: 1, unit: "un", emoji: byPlu.emoji });
+          setScanResult({ ok: true, product: byPlu, weightKg: 1, total: effectiveUnitPrice });
         } else {
           setScanResult({ ok: false, message: `${byPlu.name} requiere peso — usá el ticket de la balanza` });
         }
@@ -306,8 +307,9 @@ export default function POSContent() {
             if (bySearchPlu.unit === "un") {
               const stockError = validateStockRef.current(bySearchPlu, 1);
               if (!stockError) {
-                addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: bySearchPlu.price, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
-                setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: bySearchPlu.price });
+                const effectiveSearchPrice = getEffectivePrice(bySearchPlu);
+                addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: effectiveSearchPrice, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
+                setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: effectiveSearchPrice });
                 setTimeout(() => setScanResult(null), 2000);
               }
             }

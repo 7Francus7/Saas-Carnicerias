@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { formatCurrency } from "@/lib/constants";
 import { useClientStore, ClientProfile, ClientFormData, ClientMovement, ClientPeriod } from "@/stores/useClientStore";
 import { downloadComprobantePago, downloadCartola } from "@/lib/pdfUtils";
 import {
@@ -14,7 +13,6 @@ import ClientEmptyState from "./ClientEmptyState";
 import ClientProfilePanel from "./ClientProfilePanel";
 import ClientFormModal from "./ClientFormModal";
 import { PaymentModal, ReceiptModal, SaleModal, ClosePeriodModal, DeleteConfirmModal } from "./ClientPaymentModals";
-import type { PaymentForm, SaleForm } from "./ClientPaymentModals";
 
 type ModalType = "none" | "addClient" | "editClient" | "payment" | "newSale" | "deleteConfirm" | "receipt" | "closePeriod";
 type FilterType = "all" | "debt" | "overdue";
@@ -82,14 +80,19 @@ export default function ClientsContent() {
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [activeTab, setActiveTab] = useState<"movements" | "history" | "info">("movements");
   const [modal, setModal] = useState<ModalType>("none");
 
   const [clientForm, setClientForm] = useState<ClientFormData>(EMPTY_FORM);
   const [paymentForm, setPaymentForm] = useState({ amount: "", note: "", method: "cash" });
   const [saleForm, setSaleForm] = useState({ amount: "", description: "Venta libre en cuenta corriente" });
   const [lastReceipt, setLastReceipt] = useState<{ movement: ClientMovement; prevBalance: number } | null>(null);
-  const [movementFilter, setMovementFilter] = useState<"all" | "sale" | "payment">("all");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const errorMsg = (e: unknown, fallback: string) => {
+    const msg = e instanceof Error ? e.message : "";
+    return msg && !msg.includes("Server Components render") ? msg : fallback;
+  };
 
   const [now] = useState(() => Date.now());
 
@@ -142,10 +145,11 @@ export default function ClientsContent() {
     return `Hace ${Math.floor(days / 30)} meses`;
   }
 
-  function openAddClient() { setClientForm(EMPTY_FORM); setModal("addClient"); }
+  function openAddClient() { setClientForm(EMPTY_FORM); setActionError(null); setModal("addClient"); }
 
   function openEditClient() {
     if (!selectedClient) return;
+    setActionError(null);
     setClientForm({
       name: selectedClient.name, dni: selectedClient.dni, phone: selectedClient.phone,
       address: selectedClient.address, email: selectedClient.email, notes: selectedClient.notes,
@@ -156,10 +160,18 @@ export default function ClientsContent() {
 
   async function handleSaveClient(e: React.FormEvent) {
     e.preventDefault();
-    if (modal === "addClient") await dbCreateClient(clientForm);
-    else if (selectedClient) await dbUpdateClient(selectedClient.id, clientForm);
-    await refreshClients();
-    setModal("none");
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      if (modal === "addClient") await dbCreateClient(clientForm);
+      else if (selectedClient) await dbUpdateClient(selectedClient.id, clientForm);
+      await refreshClients();
+      setModal("none");
+    } catch (err) {
+      setActionError(errorMsg(err, "No se pudo guardar el cliente. Intentá de nuevo."));
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function handlePayment(e: React.FormEvent) {
@@ -168,15 +180,23 @@ export default function ClientsContent() {
     const amount = parseFloat(paymentForm.amount);
     if (isNaN(amount) || amount <= 0) return;
     const prevBalance = selectedClient.balance;
-    await dbAddPayment(selectedClient.id, amount, paymentForm.note, paymentForm.method);
-    await refreshClients();
-    const freshClient = useClientStore.getState().clients.find((c) => c.id === selectedClient.id);
-    const movement = freshClient?.movements[0];
-    if (movement?.type === "payment") {
-      setLastReceipt({ movement, prevBalance });
-      setModal("receipt");
-    } else setModal("none");
-    setPaymentForm({ amount: "", note: "", method: "cash" });
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      await dbAddPayment(selectedClient.id, amount, paymentForm.note, paymentForm.method);
+      await refreshClients();
+      const freshClient = useClientStore.getState().clients.find((c) => c.id === selectedClient.id);
+      const movement = freshClient?.movements[0];
+      if (movement?.type === "payment") {
+        setLastReceipt({ movement, prevBalance });
+        setModal("receipt");
+      } else setModal("none");
+      setPaymentForm({ amount: "", note: "", method: "cash" });
+    } catch (err) {
+      setActionError(errorMsg(err, "No se pudo registrar el pago. Intentá de nuevo."));
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function handleNewSale(e: React.FormEvent) {
@@ -184,18 +204,34 @@ export default function ClientsContent() {
     if (!selectedClient) return;
     const amount = parseFloat(saleForm.amount);
     if (isNaN(amount) || amount <= 0) return;
-    await dbAddSaleToAccount(selectedClient.id, amount, saleForm.description);
-    await refreshClients();
-    setSaleForm({ amount: "", description: "Venta libre en cuenta corriente" });
-    setModal("none");
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      await dbAddSaleToAccount(selectedClient.id, amount, saleForm.description);
+      await refreshClients();
+      setSaleForm({ amount: "", description: "Venta libre en cuenta corriente" });
+      setModal("none");
+    } catch (err) {
+      setActionError(errorMsg(err, "No se pudo registrar la venta. Intentá de nuevo."));
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function handleDeleteClient() {
     if (!selectedClient) return;
-    await dbDeleteClient(selectedClient.id);
-    setSelectedClient(null);
-    await refreshClients();
-    setModal("none");
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      await dbDeleteClient(selectedClient.id);
+      setSelectedClient(null);
+      await refreshClients();
+      setModal("none");
+    } catch (err) {
+      setActionError(errorMsg(err, "No se pudo eliminar el cliente."));
+    } finally {
+      setActionBusy(false);
+    }
   }
 
   async function handleClosePeriod(reason: ClientPeriod["closedReason"]) {
@@ -203,17 +239,14 @@ export default function ClientsContent() {
     await dbClosePeriod(selectedClient.id, reason);
     await refreshClients();
     setModal("none");
-    setActiveTab("history");
   }
 
   function handleDownloadCartola() { if (selectedClient) downloadCartola(selectedClient); }
   function handleDownloadReceipt() { if (selectedClient && lastReceipt) downloadComprobantePago(selectedClient, lastReceipt.movement, lastReceipt.prevBalance); }
-  function closeModal() { setModal("none"); }
+  function closeModal() { setModal("none"); setActionError(null); }
 
   const handleSelectClient = (id: string) => {
     setSelectedClient(id);
-    setActiveTab("movements");
-    setMovementFilter("all");
   };
 
   return (
@@ -245,10 +278,10 @@ export default function ClientsContent() {
             client={selectedClient}
             stats={clientStats}
             onEdit={openEditClient}
-            onDelete={() => setModal("deleteConfirm")}
-            onPayment={() => setModal("payment")}
-            onNewSale={() => setModal("newSale")}
-            onClosePeriod={() => setModal("closePeriod")}
+            onDelete={() => { setActionError(null); setModal("deleteConfirm"); }}
+            onPayment={() => { setActionError(null); setModal("payment"); }}
+            onNewSale={() => { setActionError(null); setModal("newSale"); }}
+            onClosePeriod={() => { setActionError(null); setModal("closePeriod"); }}
             onDownloadCartola={handleDownloadCartola}
           />
         )}
@@ -261,6 +294,8 @@ export default function ClientsContent() {
           onChange={setClientForm}
           onSubmit={handleSaveClient}
           onClose={closeModal}
+          error={actionError}
+          busy={actionBusy}
         />
       )}
 
@@ -271,6 +306,8 @@ export default function ClientsContent() {
           onChange={setPaymentForm}
           onSubmit={handlePayment}
           onClose={closeModal}
+          error={actionError}
+          busy={actionBusy}
         />
       )}
 
@@ -291,6 +328,8 @@ export default function ClientsContent() {
           onChange={setSaleForm}
           onSubmit={handleNewSale}
           onClose={closeModal}
+          error={actionError}
+          busy={actionBusy}
         />
       )}
 
@@ -307,6 +346,8 @@ export default function ClientsContent() {
           clientName={selectedClient.name}
           onConfirm={handleDeleteClient}
           onClose={closeModal}
+          error={actionError}
+          busy={actionBusy}
         />
       )}
     </div>

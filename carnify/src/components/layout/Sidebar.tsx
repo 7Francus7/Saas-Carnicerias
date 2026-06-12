@@ -12,6 +12,7 @@ import { NAV_ITEMS } from "@/lib/constants";
 import { useThemeStore } from "@/stores/useThemeStore";
 import { signOut, useSession } from "@/lib/auth-client";
 import { getMyPermissions } from "@/actions/employees";
+import { getBusinessName } from "@/actions/settings";
 import type { SectionKey } from "@/lib/sections";
 import { useImpersonationStore } from "@/stores/useImpersonationStore";
 
@@ -40,11 +41,15 @@ export default function Sidebar() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [permissions, setPermissions] = useState<SectionKey[] | "all">("all");
+  const [businessName, setBusinessName] = useState<string | null>(null);
 
   useEffect(() => {
     getMyPermissions()
       .then(setPermissions)
       .catch(() => setPermissions("all"));
+    getBusinessName()
+      .then(setBusinessName)
+      .catch(() => setBusinessName(null));
   }, [session?.session?.activeOrganizationId]);
 
   const activePermissions: SectionKey[] | "all" = viewingAs
@@ -53,7 +58,7 @@ export default function Sidebar() {
 
   const userName = session?.user?.name ?? "Usuario";
   const activeOrganizationId = session?.session?.activeOrganizationId;
-  const orgName = activeOrganizationId ? "Mi Carniceria" : "Carnify";
+  const orgName = activeOrganizationId ? (businessName || "Mi Carniceria") : "Carnify";
   const iniciales = userName
     .split(" ")
     .map((word) => word[0])

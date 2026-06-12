@@ -88,14 +88,19 @@ export async function closeCaja(realAmounts: Record<string, number>) {
   });
   if (!session) throw new Error("No hay caja abierta");
 
-  // Calculate teorico and diff
+  // Calculate teorico and diff.
+  // Fiado (cuenta corriente) is NOT a reconcilable amount — it never lands in caja
+  // nor in a bank account, so it must be excluded from the theoretical totals.
+  // Including it produced a false "faltante" equal to the fiado total on every close.
   const tericoByMethod: Record<string, number> = { cash: session.startingCash };
   session.sales.forEach((sale: { method: string; total: number; splits: { method: string; amount: number }[] }) => {
     if (sale.splits.length > 0) {
       sale.splits.forEach((sp: { method: string; amount: number }) => {
+        if (sp.method === "fiado") return;
         tericoByMethod[sp.method] = (tericoByMethod[sp.method] ?? 0) + sp.amount;
       });
     } else {
+      if (sale.method === "fiado") return;
       tericoByMethod[sale.method] = (tericoByMethod[sale.method] ?? 0) + sale.total;
     }
   });
@@ -306,7 +311,6 @@ export async function getDashboardStats() {
 
   let totalRevenue = 0;
   let totalOrders = 0;
-  let totalItems = 0;
   const clientIds = new Set<string>();
   const hourlyMap: Record<string, number> = {};
   const paymentMap: Record<string, number> = {};
@@ -319,7 +323,6 @@ export async function getDashboardStats() {
 
       totalRevenue += sale.total;
       totalOrders += 1;
-      totalItems += sale.itemCount;
       if (sale.clientId) clientIds.add(sale.clientId);
 
       const h = getARTHour(ts).toString().padStart(2, "0") + ":00";
@@ -383,6 +386,10 @@ export async function getDashboardStats() {
       .map(([method, amount]) => ({ method, amount, percentage: totalRevenue > 0 ? parseFloat(((amount / totalRevenue) * 100).toFixed(1)) : 0, color: paymentColors[method] ?? "#888" }))
       .sort((a, b) => b.amount - a.amount),
     recentSales: (activeSession?.sales ?? [])
+      .filter((v) => {
+        const ts = new Date(v.timestamp);
+        return ts >= todayStart && ts < todayEnd;
+      })
       .slice(-5).reverse()
       .map((v) => ({
         id: `TK-${v.id.substring(0, 4).toUpperCase()}`,

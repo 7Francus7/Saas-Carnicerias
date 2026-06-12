@@ -16,7 +16,7 @@ const ProductSchema = z.object({
   conversionFactor: z.number().positive().optional(),
   productType: z.enum(["raw", "processed", "resale"]).optional(),
   discountPercent: z.number().min(0).max(100).optional(),
-  discountEndDate: z.string().optional(),
+  discountEndDate: z.string().datetime().nullable().optional(),
 });
 
 export async function getProducts() {
@@ -50,9 +50,10 @@ export async function createProduct(data: z.infer<typeof ProductSchema>) {
 
 export async function updateProduct(id: string, data: Partial<z.infer<typeof ProductSchema>>) {
   const { tenantId } = await requireTenantAndSection("productos");
+  const parsed = ProductSchema.partial().parse(data);
   const product = await prisma.product.updateMany({
     where: { id, organizationId: tenantId },
-    data,
+    data: parsed,
   });
   revalidatePath("/productos");
   revalidatePath("/pos");

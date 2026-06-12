@@ -35,9 +35,11 @@ interface PaymentModalProps {
   onChange: (f: PaymentForm) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  error?: string | null;
+  busy?: boolean;
 }
 
-function PaymentModal({ client, form, onChange, onSubmit, onClose }: PaymentModalProps) {
+function PaymentModal({ client, form, onChange, onSubmit, onClose, error, busy }: PaymentModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -98,9 +100,14 @@ function PaymentModal({ client, form, onChange, onSubmit, onClose }: PaymentModa
               onChange={(e) => onChange({ ...form, note: e.target.value })} />
           </div>
 
+          {error && (
+            <div className="alert alert--danger" style={{ marginBottom: 0 }}>
+              <span>{error}</span>
+            </div>
+          )}
           <div className="modal__actions">
             <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn--success">
+            <button type="submit" className="btn btn--success" disabled={busy}>
               <ReceiptText size={15} /> Registrar y ver boleta
             </button>
           </div>
@@ -197,9 +204,11 @@ interface SaleModalProps {
   onChange: (f: SaleForm) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  error?: string | null;
+  busy?: boolean;
 }
 
-function SaleModal({ client, form, onChange, onSubmit, onClose }: SaleModalProps) {
+function SaleModal({ client, form, onChange, onSubmit, onClose, error, busy }: SaleModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -248,9 +257,14 @@ function SaleModal({ client, form, onChange, onSubmit, onClose }: SaleModalProps
               onChange={(e) => onChange({ ...form, description: e.target.value })} />
           </div>
 
+          {error && (
+            <div className="alert alert--danger" style={{ marginBottom: 0 }}>
+              <span>{error}</span>
+            </div>
+          )}
           <div className="modal__actions">
             <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn--primary">
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               <ArrowUpRight size={15} /> Registrar venta
             </button>
           </div>
@@ -314,9 +328,11 @@ interface DeleteConfirmModalProps {
   clientName: string;
   onConfirm: () => void;
   onClose: () => void;
+  error?: string | null;
+  busy?: boolean;
 }
 
-function DeleteConfirmModal({ clientName, onConfirm, onClose }: DeleteConfirmModalProps) {
+function DeleteConfirmModal({ clientName, onConfirm, onClose, error, busy }: DeleteConfirmModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
@@ -332,9 +348,15 @@ function DeleteConfirmModal({ clientName, onConfirm, onClose }: DeleteConfirmMod
               <p>Se eliminará el cliente y todos sus movimientos. Esta acción no se puede deshacer.</p>
             </div>
           </div>
+          {error && (
+            <div className="alert alert--danger">
+              <AlertTriangle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
           <div className="modal__actions">
             <button className="btn btn--ghost" onClick={onClose}>Cancelar</button>
-            <button className="btn btn--danger" onClick={onConfirm}>
+            <button className="btn btn--danger" onClick={onConfirm} disabled={busy}>
               <Trash2 size={14} /> Eliminar definitivamente
             </button>
           </div>

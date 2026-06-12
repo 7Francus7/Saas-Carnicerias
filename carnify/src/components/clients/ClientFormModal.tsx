@@ -9,9 +9,11 @@ interface ClientFormModalProps {
   onChange: (f: ClientFormData) => void;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  error?: string | null;
+  busy?: boolean;
 }
 
-export default function ClientFormModal({ mode, form, onChange, onSubmit, onClose }: ClientFormModalProps) {
+export default function ClientFormModal({ mode, form, onChange, onSubmit, onClose, error, busy }: ClientFormModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
@@ -82,9 +84,14 @@ export default function ClientFormModal({ mode, form, onChange, onSubmit, onClos
               value={form.notes}
               onChange={(e) => onChange({ ...form, notes: e.target.value })} />
           </div>
+          {error && (
+            <div className="alert alert--danger" style={{ marginBottom: 0 }}>
+              <span>{error}</span>
+            </div>
+          )}
           <div className="modal__actions">
             <button type="button" className="btn btn--ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn--primary">
+            <button type="submit" className="btn btn--primary" disabled={busy}>
               {mode === "add" ? "Crear cliente" : "Guardar cambios"}
             </button>
           </div>

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireTenantAndSection } from "./_helpers";
+import { requireTenant, requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 
 export async function getSettings() {
@@ -11,6 +11,16 @@ export async function getSettings() {
     create: { organizationId: tenantId },
     update: {},
   });
+}
+
+// Visible to every member regardless of section permissions (sidebar branding)
+export async function getBusinessName() {
+  const { tenantId } = await requireTenant();
+  const settings = await prisma.businessSettings.findUnique({
+    where: { organizationId: tenantId },
+    select: { nombre: true },
+  });
+  return settings?.nombre ?? null;
 }
 
 export async function getPosRuntimeSettings() {

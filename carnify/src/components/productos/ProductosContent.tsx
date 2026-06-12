@@ -12,7 +12,15 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from "@/acti
 import RecipeModal from "./RecipeModal";
 
 const UNITS = ["kg", "un", "lt"] as const;
-const EMPTY_FORM = { plu: "", name: "", category: "", price: "", unit: "kg", emoji: "🥩" };
+const EMPTY_FORM = { plu: "", name: "", category: "", price: "", unit: "kg", emoji: "🥩", discountPercent: "", discountEndDate: "" };
+
+// Date in the user's timezone — toISOString() would shift to the next day in ART
+function toLocalDateInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function ProductosContent() {
   const { products, setProducts, addProduct: storeAdd, updateProduct: storeUpdate, deleteProduct: storeDelete } = useProductsStore();
@@ -74,7 +82,11 @@ export default function ProductosContent() {
   };
 
   const openEdit = (p: Product) => {
-    setForm({ plu: p.plu, name: p.name, category: p.category, price: String(p.price), unit: p.unit, emoji: p.emoji });
+    setForm({
+      plu: p.plu, name: p.name, category: p.category, price: String(p.price), unit: p.unit, emoji: p.emoji,
+      discountPercent: p.discountPercent ? String(p.discountPercent) : "",
+      discountEndDate: p.discountEndDate ? toLocalDateInput(new Date(p.discountEndDate)) : "",
+    });
     setEditingId(p.id);
     setModal("edit");
   };
@@ -89,6 +101,11 @@ export default function ProductosContent() {
     e.preventDefault();
     const price = parseFloat(form.price);
     if (isNaN(price) || price <= 0) return;
+    const discountPercent = Math.min(100, Math.max(0, parseFloat(form.discountPercent) || 0));
+    // End of day local time so the promo stays valid through its last day
+    const discountEndDate = form.discountEndDate
+      ? new Date(`${form.discountEndDate}T23:59:59`).toISOString()
+      : null;
     setSaving(true);
     setSaveError(null);
     try {
@@ -100,6 +117,8 @@ export default function ProductosContent() {
           price,
           unit: form.unit as "kg" | "un" | "lt",
           emoji: form.emoji,
+          discountPercent,
+          discountEndDate,
         });
         storeAdd(created as Product);
       } else if (modal === "edit" && editingId) {
@@ -110,11 +129,13 @@ export default function ProductosContent() {
           price,
           unit: form.unit as "kg" | "un" | "lt",
           emoji: form.emoji,
+          discountPercent,
+          discountEndDate,
         });
-        storeUpdate(editingId, { plu: form.plu, name: form.name, category: form.category, price, unit: form.unit, emoji: form.emoji });
+        storeUpdate(editingId, { plu: form.plu, name: form.name, category: form.category, price, unit: form.unit, emoji: form.emoji, discountPercent, discountEndDate });
       }
       closeModal();
-    } catch (err) {
+    } catch {
       setSaveError("Error al guardar el producto. Intentá de nuevo.");
     } finally {
       setSaving(false);
@@ -467,6 +488,30 @@ export default function ProductosContent() {
                     maxLength={5}
                     value={form.plu}
                     onChange={(e) => setForm({ ...form, plu: e.target.value.replace(/\D/g, "") })}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Descuento (%)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="0"
+                    min={0}
+                    max={100}
+                    value={form.discountPercent}
+                    onChange={(e) => setForm({ ...form, discountPercent: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Promo válida hasta</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={form.discountEndDate}
+                    onChange={(e) => setForm({ ...form, discountEndDate: e.target.value })}
                   />
                 </div>
               </div>
