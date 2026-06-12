@@ -8,7 +8,13 @@ import DashboardContent from "@/components/dashboard/DashboardContent";
 import MarketingLanding from "@/components/marketing/MarketingLanding";
 
 export default async function Home() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  // disableCookieCache: el branch de abajo actualiza la sesión en DB y
+  // redirige a "/"; con el cache de cookie la relectura vería el valor viejo
+  // y entraría en loop infinito de redirects
+  const session = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableCookieCache: true },
+  });
 
   if (!session) {
     return <MarketingLanding />;

@@ -104,6 +104,23 @@ export const auth = betterAuth({
       maxAge: 60 * 5,
     },
   },
+  databaseHooks: {
+    session: {
+      create: {
+        // Sin esto cada login nace con activeOrganizationId null en el cookie
+        // cache (TTL 5 min) y page.tsx entra en loop de redirect a "/"
+        before: async (session) => {
+          const membership = await prisma.member.findFirst({
+            where: { userId: session.userId },
+            orderBy: { createdAt: "asc" },
+          });
+          return {
+            data: { ...session, activeOrganizationId: membership?.organizationId ?? null },
+          };
+        },
+      },
+    },
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;
