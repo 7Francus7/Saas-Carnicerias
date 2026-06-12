@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   DollarSign, ShoppingBag, Receipt, Users,
   TrendingUp, TrendingDown, ShoppingCart,
-  UserPlus, Clock, ArrowUpRight
+  UserPlus, Clock, ArrowUpRight, Package,
+  AlertTriangle, Wallet, BarChart3, Activity,
+  Boxes, RefreshCw
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
@@ -13,7 +15,8 @@ import {
 } from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
-import { getCurrentSession, getDashboardStats } from "@/actions/caja";
+import { getCurrentSession } from "@/actions/caja";
+import { getDashboardStats } from "@/actions/dashboard";
 import { useSession } from "@/lib/auth-client";
 
 type ChartPoint = { hour: string; ventas: number };
@@ -35,13 +38,72 @@ type DashboardData = {
   ticket: number;
   clients: number;
   hasOpenCaja: boolean;
+  profit: number;
+  margin: number;
+  costCoverage: number;
+  stockValue: number;
+  cajaToday: {
+    isOpen: boolean;
+    openedAt: Date | string | null;
+    totalExpected: number;
+    byMethod: { method: string; amount: number }[];
+  };
   hourlySales: ChartPoint[];
   weeklySales: WeeklyPoint[];
   paymentBreakdown: PaymentSlice[];
   recentSales: RecentSale[];
-  stockAlerts: { product: string; stock: number }[];
-  topProducts: { name: string; total: number }[];
+  stockAlerts: {
+    productId: string;
+    product: string;
+    emoji: string;
+    stock: number;
+    unit: string;
+    threshold: number;
+    status: string;
+  }[];
+  slowMovers: {
+    productId: string;
+    product: string;
+    emoji: string;
+    stock: number;
+    unit: string;
+    daysWithoutSales: number;
+  }[];
+  topProducts: {
+    productId: string;
+    name: string;
+    emoji: string | null;
+    category: string | null;
+    quantity: number;
+    unit: string;
+    revenue: number;
+    margin: number | null;
+    tickets: number;
+  }[];
+  recentMovements: {
+    id: string;
+    type: string;
+    product: string;
+    emoji: string | null;
+    quantity: number;
+    unit: string;
+    date: Date | string;
+    reason: string | null;
+  }[];
 };
+
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: "Efectivo",
+  transfer: "Transferencia",
+  card: "Tarjeta",
+  link: "QR / Link",
+  fiado: "Cuenta Cte.",
+  mixed: "Mixto",
+};
+
+function labelPayment(method: string) {
+  return PAYMENT_LABELS[method] ?? method;
+}
 
 function CustomTooltip({ active, payload, label }: {
   active?: boolean;
@@ -139,10 +201,66 @@ function StatCard({ stat, type, delay }: {
   );
 }
 
+function OpsMetric({ icon, label, value, detail, tone }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  detail: string;
+  tone: "good" | "warn" | "info" | "danger";
+}) {
+  return (
+    <div className={`ops-metric ops-metric--${tone}`}>
+      <div className="ops-metric__icon">{icon}</div>
+      <div className="ops-metric__content">
+        <span className="ops-metric__label">{label}</span>
+        <strong className="ops-metric__value">{value}</strong>
+        <span className="ops-metric__detail">{detail}</span>
+      </div>
+    </div>
+  );
+}
+
+function OperationsStrip({ data }: { data: DashboardData }) {
+  const stockTone = data.stockAlerts.some((item) => item.status === "out") ? "danger" : data.stockAlerts.length > 0 ? "warn" : "good";
+  const marginTone = data.costCoverage === 0 ? "warn" : data.margin >= 25 ? "good" : "info";
+
+  return (
+    <div className="ops-strip animate-in animate-in-delay-1">
+      <OpsMetric
+        icon={<Wallet size={20} />}
+        label="Caja del dia"
+        value={data.cajaToday.isOpen ? formatCurrency(data.cajaToday.totalExpected) : "Caja cerrada"}
+        detail={data.cajaToday.isOpen ? "Teorico actual sin cuenta corriente" : "Abrir caja para operar POS"}
+        tone={data.cajaToday.isOpen ? "good" : "danger"}
+      />
+      <OpsMetric
+        icon={<AlertTriangle size={20} />}
+        label="Alertas de stock"
+        value={`${data.stockAlerts.length}`}
+        detail={data.stockAlerts.length > 0 ? "Productos bajo minimo o sin stock" : "Inventario sin alertas criticas"}
+        tone={stockTone}
+      />
+      <OpsMetric
+        icon={<BarChart3 size={20} />}
+        label="Margen bruto"
+        value={data.costCoverage > 0 ? `${data.margin}%` : "Sin costo"}
+        detail={data.costCoverage > 0 ? `${data.costCoverage}% de ventas con costo cargado` : "Cargar costos para rentabilidad"}
+        tone={marginTone}
+      />
+      <OpsMetric
+        icon={<Boxes size={20} />}
+        label="Valor de stock"
+        value={formatCurrency(data.stockValue)}
+        detail="Valorizado por precio de venta"
+        tone="info"
+      />
+    </div>
+  );
+}
+
 function LiveClock() {
-  const [time, setTime] = useState<Date | null>(null);
+  const [time, setTime] = useState<Date>(() => new Date());
   useEffect(() => {
-    setTime(new Date());
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -152,14 +270,10 @@ function LiveClock() {
       <Clock size={16} style={{ color: "var(--text-tertiary)" }} />
       <div>
         <div className="live-clock__time" suppressHydrationWarning>
-          {time
-            ? time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })
-            : "--:--:--"}
+          {time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })}
         </div>
         <div className="live-clock__date" style={{ textTransform: "capitalize" }} suppressHydrationWarning>
-          {time
-            ? time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })
-            : ""}
+          {time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
         </div>
       </div>
     </div>
@@ -410,12 +524,12 @@ function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
                 </td>
                 <td>
                   <span className={`badge ${
-                    sale.payment === "Efectivo" ? "badge--success" :
-                    sale.payment === "Transferencia" ? "badge--info" :
-                    sale.payment === "Tarjeta" ? "badge--warning" :
+                    sale.payment === "cash" ? "badge--success" :
+                    sale.payment === "transfer" ? "badge--info" :
+                    sale.payment === "card" ? "badge--warning" :
                     "badge--neutral"
                   }`}>
-                    {sale.payment === "Cuenta Corriente" ? "Cta. Cte." : sale.payment}
+                    {labelPayment(sale.payment)}
                   </span>
                 </td>
                 <td style={{ color: sale.client ? "var(--text-primary)" : "var(--text-muted)" }}>
@@ -430,18 +544,138 @@ function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
   );
 }
 
+function TopProductsCard({ products }: { products: DashboardData["topProducts"] }) {
+  return (
+    <div className="card dashboard-list-card animate-in animate-in-delay-3">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Productos mas vendidos</div>
+          <div className="card__subtitle">Ranking real del dia por facturacion</div>
+        </div>
+      </div>
+      <div className="dashboard-list">
+        {products.length === 0 ? (
+          <div className="dashboard-empty-line">
+            <ShoppingBag size={18} /> Sin ventas registradas hoy
+          </div>
+        ) : products.map((product, index) => (
+          <div key={`${product.productId}-${product.name}`} className="dashboard-rank-row">
+            <span className="dashboard-rank-row__rank">{index + 1}</span>
+            <span className="dashboard-rank-row__emoji">{product.emoji ?? "#"}</span>
+            <div className="dashboard-rank-row__info">
+              <strong>{product.name}</strong>
+              <span>{formatNumber(product.quantity)} {product.unit} - {product.tickets} tickets</span>
+            </div>
+            <div className="dashboard-rank-row__value">
+              <strong>{formatCurrency(product.revenue)}</strong>
+              <span>{product.margin == null ? "sin costo" : `${product.margin}% margen`}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StockAlertsCard({ alerts, slowMovers }: {
+  alerts: DashboardData["stockAlerts"];
+  slowMovers: DashboardData["slowMovers"];
+}) {
+  return (
+    <div className="card dashboard-list-card animate-in animate-in-delay-4">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Alertas operativas</div>
+          <div className="card__subtitle">Stock bajo, sin stock y sin movimiento</div>
+        </div>
+      </div>
+      <div className="dashboard-alert-stack">
+        {alerts.length === 0 ? (
+          <div className="dashboard-empty-line">
+            <Package size={18} /> No hay productos bajo minimo
+          </div>
+        ) : alerts.slice(0, 5).map((item) => (
+          <div key={item.productId} className={`dashboard-alert-row dashboard-alert-row--${item.status}`}>
+            <div className="dashboard-alert-row__main">
+              <span>{item.emoji}</span>
+              <div>
+                <strong>{item.product}</strong>
+                <p>{item.status === "out" ? "Sin stock disponible" : `Minimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
+              </div>
+            </div>
+            <strong>{formatNumber(item.stock)} {item.unit}</strong>
+          </div>
+        ))}
+        {slowMovers.length > 0 && (
+          <div className="dashboard-slow-box">
+            <div className="dashboard-slow-box__title">
+              <Activity size={16} /> Sin ventas en 30 dias
+            </div>
+            <div className="dashboard-slow-box__chips">
+              {slowMovers.slice(0, 4).map((item) => (
+                <span key={item.productId}>{item.emoji} {item.product}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CajaPanel({ data }: { data: DashboardData }) {
+  return (
+    <div className="card dashboard-list-card animate-in animate-in-delay-5">
+      <div className="card__header">
+        <div>
+          <div className="card__title">Caja del dia</div>
+          <div className="card__subtitle">Control teorico por medio de pago</div>
+        </div>
+      </div>
+      {!data.cajaToday.isOpen ? (
+        <div className="dashboard-empty-line dashboard-empty-line--danger">
+          <AlertTriangle size={18} /> Caja cerrada: el POS no puede vender
+        </div>
+      ) : (
+        <div className="dashboard-list">
+          <div className="dashboard-cash-total">
+            <span>Total teorico</span>
+            <strong>{formatCurrency(data.cajaToday.totalExpected)}</strong>
+          </div>
+          {data.cajaToday.byMethod.map((row) => (
+            <div key={row.method} className="dashboard-cash-row">
+              <span>{labelPayment(row.method)}</span>
+              <strong>{formatCurrency(row.amount)}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardContent() {
   const router = useRouter();
-  const { currentSession, hydrate } = useCajaStore();
+  const { hydrate } = useCajaStore();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [chartsReady, setChartsReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
-    const s = await getCurrentSession();
-    if (s) hydrate(mapDbSessionToStore(s), []);
-    else hydrate(null, []);
-    const stats = await getDashboardStats();
-    setDashboardData(stats as DashboardData);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const s = await getCurrentSession();
+      if (s) hydrate(mapDbSessionToStore(s), []);
+      else hydrate(null, []);
+      const stats = await getDashboardStats();
+      setDashboardData(stats as DashboardData);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "No se pudo cargar el dashboard.");
+    } finally {
+      setLoading(false);
+    }
   }, [hydrate]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
@@ -464,13 +698,48 @@ export default function DashboardContent() {
   const realData = dashboardData ?? {
     revenue: 0, orders: 0, ticket: 0, clients: 0,
     hasOpenCaja: false,
+    profit: 0,
+    margin: 0,
+    costCoverage: 0,
+    stockValue: 0,
+    cajaToday: { isOpen: false, openedAt: null, totalExpected: 0, byMethod: [] },
     hourlySales: [] as ChartPoint[],
     weeklySales: [] as WeeklyPoint[],
     paymentBreakdown: [] as PaymentSlice[],
     recentSales: [] as RecentSale[],
     stockAlerts: [],
+    slowMovers: [],
     topProducts: [],
+    recentMovements: [],
   };
+
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div className="dashboard-loading">
+          <RefreshCw size={22} className="animate-spin" />
+          <span>Cargando tablero operativo...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="page-container">
+        <div className="card dashboard-error-card">
+          <AlertTriangle size={24} />
+          <div>
+            <strong>No se pudo cargar el dashboard</strong>
+            <p>{loadError}</p>
+          </div>
+          <button className="btn btn--primary btn--sm" onClick={() => void loadSession()}>
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">
@@ -497,6 +766,8 @@ export default function DashboardContent() {
         </div>
       </div>
 
+      <OperationsStrip data={realData} />
+
       {/* Stats */}
       <div className="stats-grid">
         <StatCard stat={{ label: "Ventas del Día", value: realData.revenue, trend: 0, trendDirection: "up" }} type="revenue" delay={1} />
@@ -514,6 +785,12 @@ export default function DashboardContent() {
           <RightPanel paymentData={realData.paymentBreakdown} ready={chartsReady} />
           <WeeklyChart data={realData.weeklySales} ready={chartsReady} />
         </div>
+      </div>
+
+      <div className="dashboard-ops-grid">
+        <TopProductsCard products={realData.topProducts} />
+        <StockAlertsCard alerts={realData.stockAlerts} slowMovers={realData.slowMovers} />
+        <CajaPanel data={realData} />
       </div>
 
       {/* Recent Sales */}

@@ -15,6 +15,13 @@ const CartItemSchema = z.object({
   unit: z.string(),
   emoji: z.string().optional(),
 });
+const RecordSaleSchema = z.object({
+  total: z.number().finite().nonnegative(),
+  splits: z.array(SplitSchema).min(1),
+  items: z.array(CartItemSchema).min(1),
+  clientId: z.string().optional(),
+  clientName: z.string().optional(),
+});
 
 export async function getCurrentSession() {
   const { tenantId } = await requireTenantAndSection("caja");
@@ -63,16 +70,21 @@ export async function getSessionDetail(id: string) {
 
 export async function openCaja(startingCash: number) {
   const { tenantId, userId } = await requireTenantAndSection("caja");
-  const existing = await prisma.cajaSession.findFirst({
-    where: { organizationId: tenantId, closedAt: null },
-  });
-  if (existing) throw new Error("Ya hay una caja abierta");
 
-  const session = await prisma.cajaSession.create({
-    data: { organizationId: tenantId, startingCash, openedById: userId },
-    include: { sales: true, transactions: true },
-  });
+  const session = await prisma.$transaction(async (tx) => {
+    const existing = await tx.cajaSession.findFirst({
+      where: { organizationId: tenantId, closedAt: null },
+    });
+    if (existing) throw new Error("Ya hay una caja abierta");
+
+    return tx.cajaSession.create({
+      data: { organizationId: tenantId, startingCash, openedById: userId },
+      include: { sales: true, transactions: true },
+    });
+  }, { isolationLevel: "Serializable" });
+
   revalidatePath("/caja");
+  revalidatePath("/");
   return session;
 }
 
@@ -138,6 +150,7 @@ export async function closeCaja(realAmounts: Record<string, number>) {
   });
 
   revalidatePath("/caja");
+  revalidatePath("/");
   revalidatePath("/reportes");
 }
 
@@ -149,12 +162,14 @@ export async function recordSale(
   clientName?: string,
 ) {
   const { tenantId } = await requireTenantAndSection("pos");
-  const parsedSplits = z.array(SplitSchema).parse(splits);
-  const parsedItems = z.array(CartItemSchema).parse(items);
-  if (parsedSplits.length === 0) throw new Error("La venta debe tener al menos un medio de pago");
-  if (parsedItems.length === 0) throw new Error("La venta debe tener al menos un producto");
+  const parsedSale = RecordSaleSchema.parse({ total, splits, items, clientId, clientName });
+  const parsedSplits = parsedSale.splits;
+  const parsedItems = parsedSale.items;
+  if (parsedItems.some((item) => !item.productId)) {
+    throw new Error("Todos los items de la venta deben estar asociados a un producto vigente");
+  }
 
-  const totalInCents = Math.round(total * 100);
+  const totalInCents = Math.round(parsedSale.total * 100);
   const splitTotalInCents = Math.round(
     parsedSplits.reduce((acc, split) => acc + split.amount, 0) * 100
   );
@@ -167,13 +182,6 @@ export async function recordSale(
   if (Math.abs(totalInCents - itemsTotalInCents) > 1) {
     throw new Error("El total no coincide con los productos del carrito");
   }
-
-  const [session, settings] = await Promise.all([
-    prisma.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
-    prisma.businessSettings.findUnique({ where: { organizationId: tenantId }, select: { enforceStock: true } }),
-  ]);
-  if (!session) throw new Error("No hay caja abierta");
-  const enforceStock = settings?.enforceStock ?? true;
 
   // No confiar en precios del cliente: validar contra el precio vigente del producto
   const productIds = [...new Set(parsedItems.flatMap((i) => (i.productId ? [i.productId] : [])))];
@@ -212,6 +220,49 @@ export async function recordSale(
   }
 
   const sale = await prisma.$transaction(async (tx) => {
+    const [txSession, txSettings] = await Promise.all([
+      tx.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
+      tx.businessSettings.findUnique({ where: { organizationId: tenantId }, select: { enforceStock: true } }),
+    ]);
+    if (!txSession) throw new Error("No hay caja abierta");
+    const txEnforceStock = txSettings?.enforceStock ?? true;
+
+    const txProducts = await tx.product.findMany({
+      where: { id: { in: productIds }, organizationId: tenantId },
+      select: { id: true, price: true, discountPercent: true, discountEndDate: true },
+    });
+    const txProductById = new Map(txProducts.map((product) => [product.id, product]));
+    const txNow = new Date();
+    const stockItems = Array.from(parsedItems.reduce((acc, item) => {
+      if (!item.productId) return acc;
+      const key = `${item.productId}:${item.unit}`;
+      const current = acc.get(key);
+      if (current) {
+        current.quantity += item.quantity;
+      } else {
+        acc.set(key, { ...item });
+      }
+      return acc;
+    }, new Map<string, z.infer<typeof CartItemSchema>>()).values());
+
+    for (const item of stockItems) {
+      if (!item.productId) continue;
+      const product = txProductById.get(item.productId);
+      if (!product) {
+        throw new Error(`El producto ${item.name} ya no existe. Quitalo del carrito y volve a intentar.`);
+      }
+      const discountActive =
+        product.discountPercent > 0 && (!product.discountEndDate || product.discountEndDate >= txNow);
+      const serverPrice = discountActive
+        ? product.price * (1 - product.discountPercent / 100)
+        : product.price;
+      if (Math.abs(item.price - serverPrice) > 0.01) {
+        throw new Error(
+          `El precio de ${item.name} cambio. Quitalo del carrito y volve a agregarlo para tomar el precio vigente.`
+        );
+      }
+    }
+
     const costMap = new Map<string, number>();
     const costs = await tx.productCost.findMany({
       where: { organizationId: tenantId },
@@ -221,10 +272,10 @@ export async function recordSale(
 
     const newSale = await tx.sale.create({
       data: {
-        sessionId: session.id,
-        total,
+        sessionId: txSession.id,
+        total: parsedSale.total,
         method,
-        itemCount: items.length,
+        itemCount: parsedItems.length,
         clientId: clientId ?? null,
         clientName: clientName ?? null,
         splits: {
@@ -281,16 +332,34 @@ export async function recordSale(
         where: { productId: item.productId },
       });
 
-      if (existingInventory) {
-        if (enforceStock && existingInventory.quantity < item.quantity) {
+      if (txEnforceStock) {
+        if (!existingInventory || existingInventory.quantity < item.quantity) {
+          const available = existingInventory?.quantity ?? 0;
           throw new Error(
-            `Stock insuficiente para ${item.name}. Disponible: ${existingInventory.quantity.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory.unit}.`
+            `Stock insuficiente para ${item.name}. Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory?.unit ?? item.unit}.`
           );
         }
-        // Sin enforceStock se permite stock negativo, pero el inventario siempre refleja la venta
-        await tx.inventoryItem.update({
-          where: { productId: item.productId },
+
+        const updated = await tx.inventoryItem.updateMany({
+          where: { productId: item.productId, quantity: { gte: item.quantity } },
           data: { quantity: { decrement: item.quantity }, unit: item.unit },
+        });
+        if (updated.count === 0) {
+          throw new Error(`Stock insuficiente para ${item.name}. Volve a intentar con el stock actualizado.`);
+        }
+      } else {
+        await tx.inventoryItem.upsert({
+          where: { productId: item.productId },
+          create: {
+            organizationId: tenantId,
+            productId: item.productId,
+            quantity: -item.quantity,
+            unit: item.unit,
+          },
+          update: {
+            quantity: { decrement: item.quantity },
+            unit: item.unit,
+          },
         });
       }
 
@@ -302,7 +371,7 @@ export async function recordSale(
           productName: item.name,
           quantity: item.quantity,
           unit: item.unit,
-          note: `Venta #${newSale.id.slice(-6)}`,
+          note: `Venta #${newSale.id.slice(-6)} - descuento automatico por POS`,
         },
       });
     }
@@ -311,6 +380,7 @@ export async function recordSale(
   });
 
   revalidatePath("/caja");
+  revalidatePath("/");
   revalidatePath("/inventario");
   revalidatePath("/reportes");
   revalidatePath("/clientes");
@@ -646,6 +716,7 @@ export async function cancelSale(saleId: string, reason: string) {
   });
 
   revalidatePath("/caja");
+  revalidatePath("/");
   revalidatePath("/inventario");
   revalidatePath("/reportes");
   revalidatePath("/clientes");

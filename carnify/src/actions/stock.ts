@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const MovementSchema = z.object({
-  type: z.enum(["entry", "exit", "adjustment", "sale"]),
+  type: z.enum(["entry", "exit", "adjustment", "sale", "cancellation"]),
   productName: z.string().min(1),
   quantity: z.number().positive(),
   unit: z.string(),
@@ -122,5 +122,6 @@ export async function addStockMovement(data: z.infer<typeof MovementSchema>) {
   });
 
   revalidatePath("/inventario");
+  revalidatePath("/");
   return movement;
 }
