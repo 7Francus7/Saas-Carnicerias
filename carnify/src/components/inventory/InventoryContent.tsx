@@ -20,6 +20,8 @@ interface Movement {
   quantity: number;
   unit: string;
   supplier?: string | null;
+  batch?: string | null;
+  origin?: string | null;
   note?: string | null;
   product?: { id: string; name: string; emoji: string } | null;
 }
@@ -90,21 +92,30 @@ export default function InventoryContent() {
   const currentMonthIn = useMemo(() => {
     const now = new Date();
     return movements
-      .filter((movement) => movement.type === "entry" && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
+      .filter((movement) => ["entry", "cancellation"].includes(movement.type) && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
       .reduce((acc, movement) => acc + movement.quantity, 0);
   }, [movements]);
 
   const currentMonthOut = useMemo(() => {
     const now = new Date();
     return movements
-      .filter((movement) => movement.type === "exit" && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
+      .filter((movement) => ["exit", "sale"].includes(movement.type) && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
       .reduce((acc, movement) => acc + movement.quantity, 0);
   }, [movements]);
 
   const lowStockCount = useMemo(
-    () => inventory.filter((item) => item.quantity > 0 && item.quantity <= stockAlertThreshold).length,
+    () => inventory.filter((item) => item.quantity <= stockAlertThreshold).length,
     [inventory, stockAlertThreshold]
   );
+
+  const getMovementDirection = (type: string) => (["entry", "cancellation"].includes(type) ? "in" : "out");
+  const getMovementLabel = (type: string) => {
+    if (type === "entry") return "Entrada";
+    if (type === "exit") return "Salida";
+    if (type === "sale") return "Venta POS";
+    if (type === "cancellation") return "Anulacion";
+    return "Ajuste";
+  };
 
   async function refreshInventory() {
     const refreshed = await getInventory();
@@ -197,7 +208,7 @@ export default function InventoryContent() {
         <div className="stat-card">
           <div className="stat-card__icon stat-card__icon--orange"><AlertTriangle size={20} /></div>
           <div className="stat-card__content">
-            <span className="stat-card__label">Stock Bajo</span>
+            <span className="stat-card__label">Stock Critico</span>
             <span className="stat-card__value">{lowStockCount}</span>
           </div>
         </div>
@@ -296,19 +307,22 @@ export default function InventoryContent() {
             <div className="movement-list">
               {movements.map((movement) => (
                 <div key={movement.id} className="movement-card">
-                  <div className={`movement-icon movement-icon--${movement.type}`}>
-                    {movement.type === "entry" ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+                  <div className={`movement-icon movement-icon--${getMovementDirection(movement.type)}`}>
+                    {getMovementDirection(movement.type) === "in" ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                   </div>
                   <div className="movement-details">
                     <div className="movement-row">
                       <span className="movement-product">
                         {movement.product?.emoji ?? "📦"} {movement.productName}
                       </span>
-                      <span className={`movement-qty movement-qty--${movement.type}`}>
-                        {movement.type === "entry" ? "+" : "-"}{movement.quantity} {movement.unit}
+                      <span className={`movement-qty movement-qty--${getMovementDirection(movement.type)}`}>
+                        {getMovementDirection(movement.type) === "in" ? "+" : "-"}{movement.quantity} {movement.unit}
                       </span>
                     </div>
                     <div className="movement-row">
+                      <span className="movement-meta">
+                        {getMovementLabel(movement.type)}
+                      </span>
                       <span className="movement-meta">
                         <Calendar size={12} /> {new Date(movement.date).toLocaleString("es-AR")}
                       </span>
@@ -317,11 +331,11 @@ export default function InventoryContent() {
                           <Truck size={12} /> {movement.supplier}
                         </span>
                       )}
-                      {(movement as any).batch && (
-                        <span className="movement-meta">Lote: {(movement as any).batch}</span>
+                      {movement.batch && (
+                        <span className="movement-meta">Lote: {movement.batch}</span>
                       )}
-                      {(movement as any).origin && (
-                        <span className="movement-meta">Origen: {(movement as any).origin}</span>
+                      {movement.origin && (
+                        <span className="movement-meta">Origen: {movement.origin}</span>
                       )}
                     </div>
                     {movement.note && <p className="movement-note">{movement.note}</p>}
@@ -470,14 +484,14 @@ export default function InventoryContent() {
         .movement-list { display: flex; flex-direction: column; gap: 12px; }
         .movement-card { background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: var(--radius-md); display: flex; gap: 20px; align-items: center; }
         .movement-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-        .movement-icon--entry { background: var(--success-soft); color: var(--success); }
-        .movement-icon--exit { background: var(--danger-soft); color: var(--danger); }
+        .movement-icon--in { background: var(--success-soft); color: var(--success); }
+        .movement-icon--out { background: var(--danger-soft); color: var(--danger); }
         .movement-details { flex: 1; }
         .movement-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
         .movement-product { font-weight: 700; color: var(--text-primary); }
         .movement-qty { font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; }
-        .movement-qty--entry { color: var(--success); }
-        .movement-qty--exit { color: var(--danger); }
+        .movement-qty--in { color: var(--success); }
+        .movement-qty--out { color: var(--danger); }
         .movement-meta { color: var(--text-tertiary); font-size: 0.75rem; display: flex; align-items: center; gap: 5px; }
         .movement-note { margin-top: 8px; font-size: 0.85rem; color: var(--text-muted); background: var(--bg-secondary); padding: 8px 12px; border-radius: 6px; border-left: 3px solid var(--border-light); }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

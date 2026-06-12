@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   X, Plus, Trash2, Loader2, Calculator,
 } from "lucide-react";
@@ -24,6 +24,8 @@ interface Props {
   onClose: () => void;
 }
 
+type RecipeMap = Awaited<ReturnType<typeof getRecipes>>;
+
 const fieldStyle: React.CSSProperties = {
   background: "var(--bg-secondary)",
   border: "1px solid var(--border-light)",
@@ -37,16 +39,15 @@ const fieldStyle: React.CSSProperties = {
 
 export default function RecipeModal({ product, onClose }: Props) {
   const products = useProductsStore((s) => s.products);
-  const [recipes, setRecipes] = useState<Record<string, any[]>>({});
+  const [recipes, setRecipes] = useState<RecipeMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<RecipeItemRow[]>([]);
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async () => {
     const data = await getRecipes();
     setRecipes(data);
-    const existing = (data[product.id] || []).map((r: any) => ({
+    const existing = (data[product.id] || []).map((r) => ({
       id: r.id,
       inputId: r.input.id,
       inputName: r.input.name,
@@ -58,9 +59,12 @@ export default function RecipeModal({ product, onClose }: Props) {
     }));
     setItems(existing);
     setLoading(false);
-  };
+  }, [product.id]);
 
-  useEffect(() => { load(); }, [product.id]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const addItem = () => {
     setItems((prev) => [
@@ -69,10 +73,10 @@ export default function RecipeModal({ product, onClose }: Props) {
     ]);
   };
 
-  const updateItem = (idx: number, field: string, value: any) => {
+  const updateItem = <K extends keyof RecipeItemRow>(idx: number, field: K, value: RecipeItemRow[K]) => {
     setItems((prev) => {
       const next = [...prev];
-      (next[idx] as any)[field] = value;
+      next[idx] = { ...next[idx], [field]: value };
       if (field === "inputId") {
         const p = products.find((pr) => pr.id === value);
         if (p) {

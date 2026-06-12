@@ -97,10 +97,7 @@ export default function PersonalContent() {
   useEffect(() => { void loadStaff(); }, [loadStaff]);
   const [now] = useState(() => Date.now());
 
-  const selectedStaff = useMemo(
-    () => staff.find(p => p.id === selectedStaffId) ?? null,
-    [staff, selectedStaffId]
-  );
+  const selectedStaff = staff.find(p => p.id === selectedStaffId) ?? null;
 
   const filteredStaff = useMemo(() => {
     let list = staff;

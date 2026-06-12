@@ -4,10 +4,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Search, ShoppingCart, Trash2, X,
   Scan, CheckCircle, AlertCircle,
+  Package, BadgeDollarSign, Scale,
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES, PAYMENT_METHODS,
-  formatCurrency,
+  formatCurrency, formatNumber,
 } from "@/lib/constants";
 import { usePOSStore } from "@/stores/usePOSStore";
 import { useProductsStore } from "@/stores/useProductsStore";
@@ -179,9 +180,9 @@ export default function POSContent() {
 
   const getAvailableStock = useCallback((productId: string) => {
     const inventory = inventoryByProduct[productId];
-    if (!inventory) return null;
+    if (!inventory) return posSettings.enforceStock ? 0 : null;
     return inventory.quantity - (reservedQuantityByProduct[productId] ?? 0);
-  }, [inventoryByProduct, reservedQuantityByProduct]);
+  }, [inventoryByProduct, posSettings.enforceStock, reservedQuantityByProduct]);
 
   const validateStockAvailability = useCallback((product: Product, requestedQuantity: number) => {
     if (!posSettings.enforceStock) return null;
@@ -258,13 +259,15 @@ export default function POSContent() {
   const showCheckoutModalRef = useRef(showCheckoutModal);
   const showSuccessModalRef = useRef(showSuccessModal);
 
-  searchRef.current = search;
-  pluMapRef.current = pluMap;
-  processScanRef.current = processScan;
-  validateStockRef.current = validateStockAvailability;
-  showWeightModalRef.current = showWeightModal;
-  showCheckoutModalRef.current = showCheckoutModal;
-  showSuccessModalRef.current = showSuccessModal;
+  useEffect(() => {
+    searchRef.current = search;
+    pluMapRef.current = pluMap;
+    processScanRef.current = processScan;
+    validateStockRef.current = validateStockAvailability;
+    showWeightModalRef.current = showWeightModal;
+    showCheckoutModalRef.current = showCheckoutModal;
+    showSuccessModalRef.current = showSuccessModal;
+  }, [pluMap, processScan, search, showCheckoutModal, showSuccessModal, showWeightModal, validateStockAvailability]);
 
   // Global keydown listener — barcode scanners + keyboard shortcuts
   useEffect(() => {
@@ -336,7 +339,7 @@ export default function POSContent() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [addToCart, clearCart, createCartItemId]);
 
   // ── Product helpers ──────────────────────────────────────────────────────
   const filteredProducts = products.filter((p) => {
@@ -522,6 +525,16 @@ export default function POSContent() {
 
   const totalPaid = paymentSplits.reduce((acc, s) => acc + s.amount, 0);
   const remainingToPay = total - totalPaid;
+  const totalKgInCart = cart.filter((i) => i.unit === "kg").reduce((acc, item) => acc + item.quantity, 0);
+  const unitItemsInCart = cart.filter((i) => i.unit !== "kg").reduce((acc, item) => acc + item.quantity, 0);
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { todos: products.length };
+    products.forEach((product) => {
+      const key = product.category.toLowerCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+    });
+    return counts;
+  }, [products]);
 
   return (
     <div className="pos-layout">
@@ -565,12 +578,36 @@ export default function POSContent() {
             />
           </div>
 
+          <div className="pos-operation-strip">
+            <div className="pos-operation-metric">
+              <ShoppingCart size={17} />
+              <span>{cart.length} lineas</span>
+              <strong>{formatCurrency(total)}</strong>
+            </div>
+            <div className="pos-operation-metric">
+              <Scale size={17} />
+              <span>Peso</span>
+              <strong>{totalKgInCart.toFixed(3)} kg</strong>
+            </div>
+            <div className="pos-operation-metric">
+              <Package size={17} />
+              <span>Unidades</span>
+              <strong>{formatNumber(unitItemsInCart)}</strong>
+            </div>
+            <div className={`pos-operation-metric ${currentSession ? "pos-operation-metric--ok" : "pos-operation-metric--danger"}`}>
+              <BadgeDollarSign size={17} />
+              <span>Caja</span>
+              <strong>{currentSession ? "Abierta" : "Cerrada"}</strong>
+            </div>
+          </div>
+
           <div className="pos-categories">
             <button
               className={`pos-category ${selectedCategory === "todos" ? "pos-category--active" : ""}`}
               onClick={() => setSelectedCategory("todos")}
             >
               Todos
+              <span>{categoryCounts.todos ?? 0}</span>
             </button>
             {PRODUCT_CATEGORIES.map((cat) => (
               <button
@@ -579,13 +616,20 @@ export default function POSContent() {
                 onClick={() => setSelectedCategory(cat.label.toLowerCase())}
               >
                 {cat.emoji} {cat.label}
+                <span>{categoryCounts[cat.label.toLowerCase()] ?? 0}</span>
               </button>
             ))}
           </div>
         </div>
 
         <div className="pos-grid">
-          {filteredProducts.map((product) => {
+          {filteredProducts.length === 0 ? (
+            <div className="pos-empty-state">
+              <Package size={38} />
+              <strong>No hay productos para esta busqueda</strong>
+              <span>Probá con otro nombre, PLU o categoria.</span>
+            </div>
+          ) : filteredProducts.map((product) => {
             const stock = getAvailableStock(product.id);
             const effectivePrice = getEffectivePrice(product);
             return (
