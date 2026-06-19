@@ -85,10 +85,14 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
   const purchase = await prisma.$transaction(async (tx) => {
     // Load product names upfront to avoid using IDs as names in stock movements
     const productIds = parsed.items.map((i) => i.productId);
+    // C4: filtrar por tenant para evitar tocar productos de otra organización.
     const dbProducts = await tx.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, organizationId: tenantId },
       select: { id: true, name: true },
     });
+    if (dbProducts.length !== new Set(productIds).size) {
+      throw new Error("Uno o más productos no existen en esta carnicería");
+    }
     const productNameMap = new Map(dbProducts.map((p) => [p.id, p.name]));
 
     const p = await tx.purchase.create({
@@ -146,6 +150,25 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
         create: { productId: item.productId, organizationId: tenantId, cost: item.unitCost },
         update: { cost: item.unitCost },
       });
+    }
+
+    // C2: una compra pagada en efectivo sale del cajón físico. Registrar egreso
+    // de caja en la sesión abierta para que el teórico de cierre lo contemple.
+    if (parsed.paymentMethod === "cash") {
+      const openSession = await tx.cajaSession.findFirst({
+        where: { organizationId: tenantId, closedAt: null },
+      });
+      if (openSession) {
+        await tx.cashTransaction.create({
+          data: {
+            organizationId: tenantId,
+            sessionId: openSession.id,
+            type: "out",
+            amount: total,
+            reason: `Compra mercadería #${p.id.slice(-6)}`,
+          },
+        });
+      }
     }
 
     return p;

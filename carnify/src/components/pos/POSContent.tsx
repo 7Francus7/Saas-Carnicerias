@@ -101,6 +101,7 @@ export default function POSContent() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [submittingSale, setSubmittingSale] = useState(false);
   const [inventoryByProduct, setInventoryByProduct] = useState<Record<string, { quantity: number; unit: string }>>({});
   const [businessName, setBusinessName] = useState("Carnify");
   const [posSettings, setPosSettings] = useState<PosSettings>(DEFAULT_POS);
@@ -394,6 +395,7 @@ export default function POSContent() {
   };
 
   const handleCompleteSale = async () => {
+    if (submittingSale) return;
     setCheckoutError(null);
     if (paymentSplits.length === 0) {
       setCheckoutError("Elegi al menos un medio de pago.");
@@ -427,6 +429,7 @@ export default function POSContent() {
       emoji: item.emoji,
     }));
 
+    setSubmittingSale(true);
     try {
       await dbRecordSale(
         total,
@@ -450,6 +453,8 @@ export default function POSContent() {
           ? msg
           : "No se pudo registrar la venta. Intentá de nuevo."
       );
+    } finally {
+      setSubmittingSale(false);
     }
   };
 
@@ -1018,8 +1023,9 @@ export default function POSContent() {
                       className="btn btn--primary btn--full btn--large" 
                       onClick={handleCompleteSale}
                       disabled={
+                        submittingSale ||
                         paymentSplits.length === 0 ||
-                        remainingToPay > 0 || 
+                        remainingToPay > 0 ||
                         (paymentSplits.some(s => s.method === "fiado") && !selectedClientId)
                       }
                     >

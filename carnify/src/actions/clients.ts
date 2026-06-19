@@ -132,6 +132,25 @@ export async function addPayment(
       },
     });
 
+    // C1: un cobro en efectivo entra al cajón físico. Registrar ingreso de caja
+    // en la sesión abierta para que el teórico de cierre lo contemple.
+    if (method === "cash") {
+      const openSession = await tx.cajaSession.findFirst({
+        where: { organizationId: tenantId, closedAt: null },
+      });
+      if (openSession) {
+        await tx.cashTransaction.create({
+          data: {
+            organizationId: tenantId,
+            sessionId: openSession.id,
+            type: "in",
+            amount,
+            reason: `Cobro cta. cte. ${client.name}`,
+          },
+        });
+      }
+    }
+
     return mov;
   });
 
@@ -220,13 +239,8 @@ export async function closePeriod(clientId: string, reason: "settled" | "month_e
       where: { clientId, periodId: null },
       data: { periodId: period.id },
     });
-
-    if (reason === "settled") {
-      await tx.client.update({
-        where: { id: clientId },
-        data: { balance: 0, status: "active" },
-      });
-    }
+    // C3: cerrar período archiva movimientos pero NUNCA pone balance en 0 sin un
+    // cobro real. La única forma de saldar es registrar pagos vía addPayment.
   });
 
   revalidatePath("/clientes");
