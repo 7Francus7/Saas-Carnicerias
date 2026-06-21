@@ -3533,6 +3533,16 @@ a:hover { color: var(--primary-light); }
   letter-spacing: -0.02em;
 }
 
+/* Cifras tabulares: los montos no "bailan" al actualizarse en vivo */
+.pos-card__price,
+.pos-operation-metric strong,
+.pos-cart-item__price,
+.pos-cart-item__total,
+.pos-summary__row,
+.pos-summary__total {
+  font-variant-numeric: tabular-nums;
+}
+
 .pos-checkout-btn {
   width: 100%;
   background: var(--success);
