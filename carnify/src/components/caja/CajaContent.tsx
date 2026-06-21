@@ -293,8 +293,38 @@ export default function CajaContent() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", gap: 12, color: "var(--text-muted)" }}>
-        <Loader2 size={24} className="animate-spin" /> Cargando caja...
+      <div className="page-container" aria-busy="true" aria-label="Cargando caja">
+        <div className="page-header">
+          <div className="page-header__left" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="skeleton" style={{ width: 140, height: 14 }} />
+            <div className="skeleton" style={{ width: 260, height: 30 }} />
+          </div>
+          <div className="page-header__right">
+            <div className="skeleton" style={{ width: 140, height: 40, borderRadius: 12 }} />
+          </div>
+        </div>
+        <div className="stats-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton" style={{ width: "55%", height: 12 }} />
+              <div className="skeleton" style={{ width: "75%", height: 24, marginTop: 4 }} />
+            </div>
+          ))}
+        </div>
+        <div className="caja-two-col">
+          <div className="skeleton-card" style={{ minHeight: 360, gap: 14 }}>
+            <div className="skeleton" style={{ width: 180, height: 16 }} />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton" style={{ width: "100%", height: 44 }} />
+            ))}
+          </div>
+          <div className="skeleton-card" style={{ minHeight: 360, gap: 14 }}>
+            <div className="skeleton" style={{ width: 140, height: 16 }} />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="skeleton" style={{ width: "100%", height: 36 }} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

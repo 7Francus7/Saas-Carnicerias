@@ -142,6 +142,8 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.6;
+  /* App de datos: cifras tabulares en toda la UI para que montos y tablas no se desplacen */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Scrollbar styling */
