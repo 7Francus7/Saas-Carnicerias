@@ -49,6 +49,9 @@ const EMPTY_FORM = {
   sections: [] as SectionKey[]
 };
 
+// Secciones que un empleado nuevo ve por defecto (operación básica de mostrador)
+const DEFAULT_EMPLOYEE_SECTIONS: SectionKey[] = ["dashboard", "pos", "clientes", "caja"];
+
 const SECTION_ICONS: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
   dashboard: LayoutDashboard,
   pos:       ShoppingCart,
@@ -85,7 +88,7 @@ export default function EmpleadosContent() {
   useEffect(() => { load(); }, [load]);
 
   function openCreate() {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, sections: [...DEFAULT_EMPLOYEE_SECTIONS] });
     setError(null);
     setModal("create");
   }
