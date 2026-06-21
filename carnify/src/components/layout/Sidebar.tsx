@@ -6,11 +6,11 @@ import Link from "next/link";
 import {
   LayoutDashboard, ShoppingCart, Store, Package, Beef,
   Calculator, Users, Users2, Truck, UserCog, Wallet, BarChart3,
-  Settings, LogOut, ChevronRight, Sun, Moon, Menu, X, RefreshCw,
+  Settings, LogOut, ChevronRight, Sun, Moon, Menu, X, UserPlus, Check, Loader2,
 } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
 import { useThemeStore } from "@/stores/useThemeStore";
-import { signOut, useSession } from "@/lib/auth-client";
+import { signOut, useSession, multiSession } from "@/lib/auth-client";
 import { getMyPermissions } from "@/actions/employees";
 import { getBusinessName } from "@/actions/settings";
 import type { SectionKey } from "@/lib/sections";
@@ -43,6 +43,10 @@ export default function Sidebar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [permissions, setPermissions] = useState<SectionKey[] | "all">("all");
   const [businessName, setBusinessName] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<
+    { id: string; userId: string; token: string; name: string; email: string }[]
+  >([]);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
 
   useEffect(() => {
     getMyPermissions()
@@ -87,19 +91,58 @@ export default function Sidebar() {
     }))
     .filter((section) => section.items.length > 0);
 
+  const loadAccounts = async () => {
+    try {
+      const { data } = await multiSession.listDeviceSessions();
+      if (data) {
+        setAccounts(
+          data.map((d) => ({
+            id: d.session.id,
+            userId: d.user.id,
+            token: d.session.token,
+            name: d.user.name || d.user.email,
+            email: d.user.email,
+          }))
+        );
+      }
+    } catch {
+      setAccounts([]);
+    }
+  };
+
+  const openUserMenu = () => {
+    setUserMenuOpen((v) => {
+      const next = !v;
+      if (next) loadAccounts();
+      return next;
+    });
+  };
+
+  const handleSelectAccount = async (token: string, userId: string) => {
+    if (userId === session?.user?.id) {
+      setUserMenuOpen(false);
+      return;
+    }
+    setSwitchingTo(token);
+    stopViewAs();
+    await multiSession.setActive({ sessionToken: token });
+    setUserMenuOpen(false);
+    setSwitchingTo(null);
+    router.push("/");
+    router.refresh();
+  };
+
+  const handleAddAccount = () => {
+    setUserMenuOpen(false);
+    stopViewAs();
+    router.push("/login?switch=1");
+  };
+
   const handleLogout = async () => {
     setUserMenuOpen(false);
     stopViewAs();
     await signOut();
     router.push("/login");
-    router.refresh();
-  };
-
-  const handleSwitchAccount = async () => {
-    setUserMenuOpen(false);
-    stopViewAs();
-    await signOut();
-    router.push("/login?switch=1");
     router.refresh();
   };
 
@@ -262,9 +305,88 @@ export default function Sidebar() {
                     overflow: "hidden",
                   }}
                 >
+                  <div
+                    style={{
+                      padding: "8px 12px 4px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Cuentas
+                  </div>
+
+                  {accounts.map((acc) => {
+                    const isActive = acc.userId === session?.user?.id;
+                    const initials = acc.name
+                      .split(" ")
+                      .map((w) => w[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+                    return (
+                      <button
+                        key={acc.id}
+                        role="menuitem"
+                        disabled={switchingTo !== null}
+                        onClick={() => handleSelectAccount(acc.token, acc.userId)}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: "8px 12px",
+                          background: isActive ? "rgba(220,38,38,0.08)" : "none",
+                          border: "none",
+                          cursor: switchingTo ? "default" : "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div
+                          className="sidebar__user-avatar"
+                          style={{ width: 28, height: 28, fontSize: 11, flexShrink: 0 }}
+                        >
+                          {initials}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {acc.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {acc.email}
+                          </div>
+                        </div>
+                        {switchingTo === acc.token ? (
+                          <Loader2 size={15} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+                        ) : isActive ? (
+                          <Check size={15} style={{ color: "#DC2626" }} />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+
                   <button
                     role="menuitem"
-                    onClick={handleSwitchAccount}
+                    onClick={handleAddAccount}
                     style={{
                       width: "100%",
                       display: "flex",
@@ -273,6 +395,7 @@ export default function Sidebar() {
                       padding: "10px 12px",
                       background: "none",
                       border: "none",
+                      borderTop: "1px solid var(--border, rgba(255,255,255,0.08))",
                       cursor: "pointer",
                       color: "var(--text-primary)",
                       fontSize: 13,
@@ -280,8 +403,8 @@ export default function Sidebar() {
                       textAlign: "left",
                     }}
                   >
-                    <RefreshCw size={15} />
-                    Cambiar de cuenta
+                    <UserPlus size={15} />
+                    Agregar otra cuenta
                   </button>
                   <button
                     role="menuitem"
@@ -310,7 +433,7 @@ export default function Sidebar() {
             )}
 
             <button
-              onClick={() => setUserMenuOpen((v) => !v)}
+              onClick={openUserMenu}
               aria-haspopup="menu"
               aria-expanded={userMenuOpen}
               title="Cuenta"

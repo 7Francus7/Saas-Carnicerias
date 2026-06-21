@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { organization, admin } from "better-auth/plugins";
+import { organization, admin, multiSession } from "better-auth/plugins";
 import { prisma } from "./db";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -97,6 +97,7 @@ export const auth = betterAuth({
       membershipLimit: 20,
     }),
     admin(),
+    multiSession({ maximumSessions: 5 }),
   ],
   session: {
     cookieCache: {
