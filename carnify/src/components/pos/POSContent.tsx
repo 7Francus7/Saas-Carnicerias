@@ -254,6 +254,7 @@ export default function POSContent() {
   // Refs for unstable values used in keydown handler (avoid listener re-registration)
   const searchRef = useRef(search);
   const pluMapRef = useRef(pluMap);
+  const productsRef = useRef(products);
   const processScanRef = useRef(processScan);
   const validateStockRef = useRef(validateStockAvailability);
   const showWeightModalRef = useRef(showWeightModal);
@@ -263,12 +264,13 @@ export default function POSContent() {
   useEffect(() => {
     searchRef.current = search;
     pluMapRef.current = pluMap;
+    productsRef.current = products;
     processScanRef.current = processScan;
     validateStockRef.current = validateStockAvailability;
     showWeightModalRef.current = showWeightModal;
     showCheckoutModalRef.current = showCheckoutModal;
     showSuccessModalRef.current = showSuccessModal;
-  }, [pluMap, processScan, search, showCheckoutModal, showSuccessModal, showWeightModal, validateStockAvailability]);
+  }, [pluMap, products, processScan, search, showCheckoutModal, showSuccessModal, showWeightModal, validateStockAvailability]);
 
   // Global keydown listener — barcode scanners + keyboard shortcuts
   useEffect(() => {
@@ -315,6 +317,31 @@ export default function POSContent() {
                 addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: effectiveSearchPrice, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
                 setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: effectiveSearchPrice });
                 setTimeout(() => setScanResult(null), 2000);
+              }
+            }
+            setSearch("");
+            return;
+          }
+
+          // No es un PLU: si la búsqueda por nombre deja un único producto, agregarlo
+          const query = currentSearch.trim().toLowerCase();
+          const nameMatches = productsRef.current.filter((p) => p.name.toLowerCase().includes(query));
+          if (nameMatches.length === 1) {
+            const match = nameMatches[0];
+            if (match.unit === "kg") {
+              setActiveProduct(match);
+              setWeightValue("");
+              setShowWeightModal(true);
+            } else {
+              const stockError = validateStockRef.current(match, 1);
+              if (!stockError) {
+                const effectiveSearchPrice = getEffectivePrice(match);
+                addToCart({ id: createCartItemId(match.id), productId: match.id, name: match.name, price: effectiveSearchPrice, quantity: 1, unit: "un", emoji: match.emoji });
+                setScanResult({ ok: true, product: match, weightKg: 1, total: effectiveSearchPrice });
+                setTimeout(() => setScanResult(null), 2000);
+              } else {
+                setScanResult({ ok: false, message: stockError });
+                setTimeout(() => setScanResult(null), 3000);
               }
             }
             setSearch("");

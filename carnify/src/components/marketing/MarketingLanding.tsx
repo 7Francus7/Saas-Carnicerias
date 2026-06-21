@@ -5,29 +5,29 @@ const features = [
   {
     icon: FeatureIcon(Beef),
     title: "Punto de venta y balanza",
-    description: "Vende por unidad o por kilo, registra medios de pago mixtos y acelera caja en horario pico.",
+    description: "Vendé por unidad o por kilo, registrá medios de pago mixtos y acelerá la caja en horario pico.",
   },
   {
     icon: FeatureIcon(Wallet),
     title: "Caja y cierre diario",
-    description: "Abre, controla y cierra caja con arqueo por metodo para detectar diferencias antes de que escalen.",
+    description: "Abrí, controlá y cerrá la caja con arqueo por método para detectar diferencias antes de que escalen.",
   },
   {
     icon: FeatureIcon(Users2),
     title: "Clientes y cuenta corriente",
-    description: "Lleva saldos, pagos, periodos y comprobantes sin depender de cuadernos o planillas sueltas.",
+    description: "Llevá saldos, pagos, períodos y comprobantes sin depender de cuadernos o planillas sueltas.",
   },
   {
     icon: FeatureIcon(BarChart3),
     title: "Reportes que sirven",
-    description: "Ve ventas, ticket promedio y medios de pago para decidir compras, precios y margenes.",
+    description: "Mirá ventas, ticket promedio y medios de pago para decidir compras, precios y márgenes.",
   },
 ];
 
 const steps = [
-  "Creas tu cuenta y tu carniceria en minutos.",
-  "Cargas productos, precios y reglas basicas del negocio.",
-  "Abres caja y empiezas a vender el mismo dia.",
+  "Creás tu cuenta y tu carnicería en minutos.",
+  "Cargás productos, precios y reglas básicas del negocio.",
+  "Abrís caja y empezás a vender el mismo día.",
 ];
 
 function FeatureIcon(Icon: typeof Beef) {
@@ -54,11 +54,11 @@ export default function MarketingLanding() {
         <section className="marketing-hero__copy">
           <div className="marketing-chip">
             <ShieldCheck size={14} />
-            SaaS para carnicerias con foco operativo real
+            Software para carnicerías con foco operativo real
           </div>
-          <h1>Controla ventas, caja, clientes y productos sin improvisar.</h1>
+          <h1>Controlá ventas, caja, clientes y productos sin improvisar.</h1>
           <p>
-            Carnify esta pensado para carnicerias que necesitan vender rapido, cerrar caja sin sorpresas
+            Carnify está pensado para carnicerías que necesitan vender rápido, cerrar la caja sin sorpresas
             y dejar de depender de papelitos, planillas y memoria.
           </p>
           <div className="marketing-hero__actions">
@@ -94,7 +94,7 @@ export default function MarketingLanding() {
               <span className="marketing-dot" />
             </div>
             <div className="marketing-panel__headline">
-              <span>Operacion de hoy</span>
+              <span>Operación de hoy</span>
               <strong>Lista para abrir caja</strong>
             </div>
             <div className="marketing-kpis">
@@ -122,7 +122,7 @@ export default function MarketingLanding() {
               </div>
               <div className="marketing-list__item">
                 <Wallet size={16} />
-                <span>Cierre de caja con diferencias por metodo</span>
+                <span>Cierre de caja con diferencias por método</span>
               </div>
             </div>
           </div>
@@ -131,8 +131,8 @@ export default function MarketingLanding() {
 
       <section className="marketing-section">
         <div className="marketing-section__intro">
-          <h2>Que resuelve hoy</h2>
-          <p>La idea no es mostrar features. La idea es cubrir lo que mas duele en la operacion diaria.</p>
+          <h2>Qué resuelve hoy</h2>
+          <p>La idea no es mostrar funciones. Es cubrir lo que más duele en la operación diaria.</p>
         </div>
         <div className="marketing-grid">
           {features.map((feature) => (
@@ -147,8 +147,8 @@ export default function MarketingLanding() {
 
       <section className="marketing-section marketing-section--alt">
         <div className="marketing-section__intro">
-          <h2>Como se empieza</h2>
-          <p>Pensado para salir rapido. Sin consultoria eterna ni implementacion de meses.</p>
+          <h2>Cómo se empieza</h2>
+          <p>Pensado para salir rápido. Sin consultoría eterna ni implementación de meses.</p>
         </div>
         <div className="marketing-steps">
           {steps.map((step, index) => (
@@ -162,8 +162,8 @@ export default function MarketingLanding() {
 
       <section className="marketing-cta">
         <div>
-          <h2>Si tu carniceria ya vende, ya tiene sentido digitalizarla.</h2>
-          <p>Empieza con tu operacion real, no con una demo linda.</p>
+          <h2>Si tu carnicería ya vende, ya tiene sentido digitalizarla.</h2>
+          <p>Empezá con tu operación real, no con una demo linda.</p>
         </div>
         <div className="marketing-cta__actions">
           <Link href="/signup" className="btn btn--primary btn--large">Empezar ahora</Link>

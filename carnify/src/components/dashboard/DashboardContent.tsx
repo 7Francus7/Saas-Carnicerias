@@ -228,16 +228,16 @@ function OperationsStrip({ data }: { data: DashboardData }) {
     <div className="ops-strip animate-in animate-in-delay-1">
       <OpsMetric
         icon={<Wallet size={20} />}
-        label="Caja del dia"
+        label="Caja del día"
         value={data.cajaToday.isOpen ? formatCurrency(data.cajaToday.totalExpected) : "Caja cerrada"}
-        detail={data.cajaToday.isOpen ? "Teorico actual sin cuenta corriente" : "Abrir caja para operar POS"}
+        detail={data.cajaToday.isOpen ? "Teórico actual sin cuenta corriente" : "Abrir caja para operar POS"}
         tone={data.cajaToday.isOpen ? "good" : "danger"}
       />
       <OpsMetric
         icon={<AlertTriangle size={20} />}
         label="Alertas de stock"
         value={`${data.stockAlerts.length}`}
-        detail={data.stockAlerts.length > 0 ? "Productos bajo minimo o sin stock" : "Inventario sin alertas criticas"}
+        detail={data.stockAlerts.length > 0 ? "Productos bajo mínimo o sin stock" : "Inventario sin alertas críticas"}
         tone={stockTone}
       />
       <OpsMetric
@@ -549,8 +549,8 @@ function TopProductsCard({ products }: { products: DashboardData["topProducts"] 
     <div className="card dashboard-list-card animate-in animate-in-delay-3">
       <div className="card__header">
         <div>
-          <div className="card__title">Productos mas vendidos</div>
-          <div className="card__subtitle">Ranking real del dia por facturacion</div>
+          <div className="card__title">Productos más vendidos</div>
+          <div className="card__subtitle">Ranking real del día por facturación</div>
         </div>
       </div>
       <div className="dashboard-list">
@@ -592,7 +592,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
       <div className="dashboard-alert-stack">
         {alerts.length === 0 ? (
           <div className="dashboard-empty-line">
-            <Package size={18} /> No hay productos bajo minimo
+            <Package size={18} /> No hay productos bajo mínimo
           </div>
         ) : alerts.slice(0, 5).map((item) => (
           <div key={item.productId} className={`dashboard-alert-row dashboard-alert-row--${item.status}`}>
@@ -600,7 +600,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
               <span>{item.emoji}</span>
               <div>
                 <strong>{item.product}</strong>
-                <p>{item.status === "out" ? "Sin stock disponible" : `Minimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
+                <p>{item.status === "out" ? "Sin stock disponible" : `Mínimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
               </div>
             </div>
             <strong>{formatNumber(item.stock)} {item.unit}</strong>
@@ -609,7 +609,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
         {slowMovers.length > 0 && (
           <div className="dashboard-slow-box">
             <div className="dashboard-slow-box__title">
-              <Activity size={16} /> Sin ventas en 30 dias
+              <Activity size={16} /> Sin ventas en 30 días
             </div>
             <div className="dashboard-slow-box__chips">
               {slowMovers.slice(0, 4).map((item) => (
@@ -628,13 +628,13 @@ function CajaPanel({ data }: { data: DashboardData }) {
     <div className="card dashboard-list-card animate-in animate-in-delay-5">
       <div className="card__header">
         <div>
-          <div className="card__title">Caja del dia</div>
-          <div className="card__subtitle">Control teorico por medio de pago</div>
+          <div className="card__title">Caja del día</div>
+          <div className="card__subtitle">Control teórico por medio de pago</div>
         </div>
       </div>
       {!data.cajaToday.isOpen ? (
         <div className="dashboard-empty-line dashboard-empty-line--danger">
-          <AlertTriangle size={18} /> Caja cerrada: el POS no puede vender
+          <AlertTriangle size={18} /> Caja cerrada — el POS no puede vender
         </div>
       ) : (
         <div className="dashboard-list">

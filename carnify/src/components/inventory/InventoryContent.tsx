@@ -113,7 +113,7 @@ export default function InventoryContent() {
     if (type === "entry") return "Entrada";
     if (type === "exit") return "Salida";
     if (type === "sale") return "Venta POS";
-    if (type === "cancellation") return "Anulacion";
+    if (type === "cancellation") return "Anulación";
     return "Ajuste";
   };
 
@@ -182,8 +182,8 @@ export default function InventoryContent() {
     <div className="inventory-container">
       <div className="inventory-header">
         <div className="inventory-title">
-          <h1>Gestion de Inventario</h1>
-          <p>Control de stock, ingresos y salidas de mercaderia</p>
+          <h1>Gestión de Inventario</h1>
+          <p>Control de stock, ingresos y salidas de mercadería</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button className="btn btn--secondary" onClick={() => openMovementModal("exit")}>
@@ -208,7 +208,7 @@ export default function InventoryContent() {
         <div className="stat-card">
           <div className="stat-card__icon stat-card__icon--orange"><AlertTriangle size={20} /></div>
           <div className="stat-card__content">
-            <span className="stat-card__label">Stock Critico</span>
+            <span className="stat-card__label">Stock Crítico</span>
             <span className="stat-card__value">{lowStockCount}</span>
           </div>
         </div>

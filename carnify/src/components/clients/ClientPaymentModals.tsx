@@ -375,7 +375,7 @@ function ClientMiniCard({ client, balance, movements }: { client: ClientProfile;
         {balance !== undefined && (
           <div className="mini-balance">
             {movements !== undefined
-              ? `${movements} movimientos · Saldo: ${balance > 0 ? "text-danger" : "text-success"}` 
+              ? `${movements} movimientos · Saldo: `
               : `Saldo deudor: `}
             <strong className={balance > 0 ? "text-danger" : "text-success"}>{formatCurrency(balance)}</strong>
           </div>

@@ -235,8 +235,8 @@ export default function ClientProfilePanel({
                 <span>Fecha</span>
                 <span>Descripción</span>
                 <span className="text-right">Método</span>
-                <span className="text-right">Debe (+)</span>
-                <span className="text-right">Haber (−)</span>
+                <span className="text-right">Compró (+)</span>
+                <span className="text-right">Pagó (−)</span>
                 <span className="text-right">Saldo</span>
               </div>
               {filteredMovements.map((m) => (
