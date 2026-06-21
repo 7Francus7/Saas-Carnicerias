@@ -13,7 +13,7 @@ async function getSessionOrThrow() {
   return session;
 }
 
-async function requireOwnerOrAdmin() {
+async function requireOwner() {
   const session = await getSessionOrThrow();
   const tenantId = session.session.activeOrganizationId;
   if (!tenantId) throw new Error("Sin organización activa");
@@ -22,7 +22,8 @@ async function requireOwnerOrAdmin() {
     where: { userId: session.user.id, organizationId: tenantId },
   });
 
-  if (!member || (member.role !== "owner" && member.role !== "admin")) {
+  // Solo la cuenta oficial (owner) puede gestionar empleados.
+  if (!member || member.role !== "owner") {
     throw new Error("Sin permisos para gestionar empleados");
   }
 
@@ -39,7 +40,7 @@ export async function getMyPermissions(): Promise<SectionKey[] | "all"> {
 }
 
 export async function getOrgMembers() {
-  const { tenantId } = await requireOwnerOrAdmin();
+  const { tenantId } = await requireOwner();
 
   const members = await prisma.member.findMany({
     where: { organizationId: tenantId },
@@ -68,7 +69,7 @@ export async function getOrgMembers() {
     status: m.status ?? null,
     notes: m.notes ?? null,
     sections:
-      m.role === "owner" || m.role === "admin"
+      m.role === "owner"
         ? ("all" as const)
         : ((permsMap[m.id] ?? []) as SectionKey[]),
     createdAt: m.createdAt,
@@ -91,7 +92,7 @@ export async function createEmployee(data: {
   status?: string;
   notes?: string;
 }) {
-  const { tenantId } = await requireOwnerOrAdmin();
+  const { tenantId } = await requireOwner();
 
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw new Error("Ya existe un usuario con ese email");
@@ -135,7 +136,7 @@ export async function updateEmployeePermissions(
   memberId: string,
   sections: SectionKey[]
 ) {
-  const { tenantId } = await requireOwnerOrAdmin();
+  const { tenantId } = await requireOwner();
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, organizationId: tenantId },
@@ -152,7 +153,7 @@ export async function updateEmployeePermissions(
 }
 
 export async function deleteEmployee(memberId: string) {
-  const { tenantId, currentMember } = await requireOwnerOrAdmin();
+  const { tenantId, currentMember } = await requireOwner();
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, organizationId: tenantId },

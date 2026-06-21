@@ -16,7 +16,8 @@ export default async function EmpleadosPage() {
     },
   });
 
-  if (!member || (member.role !== "owner" && member.role !== "admin")) {
+  // Solo la cuenta oficial (owner) gestiona empleados.
+  if (!member || member.role !== "owner") {
     redirect("/");
   }
 

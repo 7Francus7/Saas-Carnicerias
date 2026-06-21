@@ -23,7 +23,8 @@ export async function getUserPermissions(): Promise<PermissionResult | null> {
   if (!member) return null;
 
   let sections: SectionKey[] | "all";
-  if (member.role === "owner" || member.role === "admin") {
+  // Solo la cuenta oficial (owner) ve todo; el resto queda limitado a sus secciones.
+  if (member.role === "owner") {
     sections = "all";
   } else {
     const perms = await prisma.employeePermissions.findUnique({
