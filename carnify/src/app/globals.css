@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Nunito:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ============================================
@@ -58,8 +58,8 @@
 
   /* Typography - Simpler */
   --font-heading: 'Nunito', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Geist', 'Inter', sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
 
   /* Sizing */
   --sidebar-width: 240px;
@@ -584,10 +584,13 @@ a:hover { color: var(--primary-light); }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .stat-card:hover {
   border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -12px rgba(220, 38, 38, 0.35);
 }
 
 .stat-card__top {
@@ -644,6 +647,7 @@ a:hover { color: var(--primary-light); }
 
 .stat-card__value {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary);
@@ -683,6 +687,46 @@ a:hover { color: var(--primary-light); }
   justify-content: center;
   gap: 12px;
   color: var(--text-secondary);
+}
+
+/* ── Skeleton loaders (forma del layout, no spinner) ── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 148, 148, 0.12),
+    transparent
+  );
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
 }
 
 .dashboard-error-card {
@@ -975,6 +1019,7 @@ a:hover { color: var(--primary-light); }
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
 .data-table th {

@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, ShoppingCart,
   UserPlus, Clock, ArrowUpRight, Package,
   AlertTriangle, Wallet, BarChart3, Activity,
-  Boxes, RefreshCw
+  Boxes
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis,
@@ -654,6 +654,65 @@ function CajaPanel({ data }: { data: DashboardData }) {
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="page-container" aria-busy="true" aria-label="Cargando tablero">
+      <div className="page-header">
+        <div className="page-header__left" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="skeleton" style={{ width: 150, height: 14 }} />
+          <div className="skeleton" style={{ width: 240, height: 30 }} />
+        </div>
+        <div className="page-header__right" style={{ display: "flex", gap: 12 }}>
+          <div className="skeleton" style={{ width: 130, height: 44, borderRadius: 12 }} />
+          <div className="skeleton" style={{ width: 140, height: 44, borderRadius: 12 }} />
+        </div>
+      </div>
+
+      <div className="ops-strip">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="skeleton-card" style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+              <div className="skeleton" style={{ width: "55%", height: 10 }} />
+              <div className="skeleton" style={{ width: "70%", height: 18 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="stats-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="skeleton-card">
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div className="skeleton" style={{ width: 40, height: 40, borderRadius: 12 }} />
+              <div className="skeleton" style={{ width: 48, height: 22, borderRadius: 999 }} />
+            </div>
+            <div className="skeleton" style={{ width: "65%", height: 26, marginTop: 4 }} />
+            <div className="skeleton" style={{ width: "45%", height: 12 }} />
+          </div>
+        ))}
+      </div>
+
+      <div className="dashboard-grid">
+        <div className="skeleton-card" style={{ minHeight: 320 }}>
+          <div className="skeleton" style={{ width: 160, height: 16 }} />
+          <div className="skeleton" style={{ flex: 1, minHeight: 240, marginTop: 8 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="skeleton-card" style={{ minHeight: 150 }}>
+            <div className="skeleton" style={{ width: 130, height: 14 }} />
+            <div className="skeleton" style={{ flex: 1, minHeight: 90, marginTop: 8 }} />
+          </div>
+          <div className="skeleton-card" style={{ minHeight: 150 }}>
+            <div className="skeleton" style={{ width: 130, height: 14 }} />
+            <div className="skeleton" style={{ flex: 1, minHeight: 90, marginTop: 8 }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardContent() {
   const router = useRouter();
   const { hydrate } = useCajaStore();
@@ -714,14 +773,7 @@ export default function DashboardContent() {
   };
 
   if (loading) {
-    return (
-      <div className="page-container">
-        <div className="dashboard-loading">
-          <RefreshCw size={22} className="animate-spin" />
-          <span>Cargando tablero operativo...</span>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (loadError) {
