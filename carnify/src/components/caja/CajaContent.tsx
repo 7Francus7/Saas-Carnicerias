@@ -18,6 +18,8 @@ import {
   addCashTransaction,
   cancelSale as dbCancelSale,
 } from "@/actions/caja";
+import { getMyPermissions } from "@/actions/employees";
+import { useImpersonationStore } from "@/stores/useImpersonationStore";
 
 const METHODS = [
   { key: "cash",     label: "Efectivo",         Icon: DollarSign,  color: "var(--success)", bg: "var(--success-soft)" },
@@ -78,6 +80,17 @@ function HistoryRow({ s }: { s: import("@/stores/useCajaStore").CajaSession }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function CajaContent() {
   const { currentSession, history, hydrate } = useCajaStore();
+  const { viewingAs } = useImpersonationStore();
+  // Arqueo ciego: el empleado nunca ve el efectivo esperado ni las diferencias.
+  // Solo el dueño/admin ve los montos del sistema. Empieza en "ciego" hasta
+  // confirmar que es dueño, para no filtrar el dato mientras carga.
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    getMyPermissions()
+      .then((perms) => setIsOwner(perms === "all"))
+      .catch(() => setIsOwner(false));
+  }, []);
+  const blindArqueo = !isOwner || !!viewingAs;
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [openingCaja, setOpeningCaja] = useState(false);
@@ -231,12 +244,16 @@ export default function CajaContent() {
   function openCloseModal() {
     setActionError(null);
     setArqueoReal("");
-    setCloseAmounts({
-      cash: "",
-      transfer: tericoByMethod.transfer > 0 ? String(tericoByMethod.transfer) : "",
-      card: tericoByMethod.card > 0 ? String(tericoByMethod.card) : "",
-      link: tericoByMethod.link > 0 ? String(tericoByMethod.link) : "",
-    });
+    setCloseAmounts(
+      blindArqueo
+        ? { cash: "", transfer: "", card: "", link: "" }
+        : {
+            cash: "",
+            transfer: tericoByMethod.transfer > 0 ? String(tericoByMethod.transfer) : "",
+            card: tericoByMethod.card > 0 ? String(tericoByMethod.card) : "",
+            link: tericoByMethod.link > 0 ? String(tericoByMethod.link) : "",
+          }
+    );
     setShowClose(true);
   }
 
@@ -423,8 +440,14 @@ export default function CajaContent() {
               </button>
             </div>
           </div>
-          <div className="stat-card__value" style={{ fontSize: "2.5rem" }}>{formatCurrency(efectivoTeorico)}</div>
-          <div className="stat-card__label">Efectivo Total en Caja · {txCount} ventas · Ticket promedio {formatCurrency(avgTicket)}</div>
+          <div className="stat-card__value" style={{ fontSize: "2.5rem" }}>
+            {blindArqueo ? `${txCount} ventas` : formatCurrency(efectivoTeorico)}
+          </div>
+          <div className="stat-card__label">
+            {blindArqueo
+              ? "Ventas registradas en esta sesión"
+              : `Efectivo Total en Caja · ${txCount} ventas · Ticket promedio ${formatCurrency(avgTicket)}`}
+          </div>
         </div>
       </div>
 
@@ -451,7 +474,7 @@ export default function CajaContent() {
             <div className="tx-list">
               <div className="tx-fondo-row">
                 <span className="tx-fondo-label">Fondo Inicial Apertura</span>
-                <span className="tx-fondo-value">{formatCurrency(startingCash)}</span>
+                <span className="tx-fondo-value">{blindArqueo ? "—" : formatCurrency(startingCash)}</span>
               </div>
               {transactions.length === 0 && (
                 <div className="empty-state" style={{ padding: "32px 0" }}>
@@ -574,28 +597,36 @@ export default function CajaContent() {
               <Calculator size={16} style={{ color: "var(--text-muted)" }} />
             </div>
 
-            <div className="arqueo-declared">
-              <div className="arqueo-declared__label">Efectivo Declarado (sistema)</div>
-              <div className="arqueo-declared__value">{formatCurrency(efectivoTeorico)}</div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                { label: "Fondo inicial",       value: startingCash,            color: "var(--text-secondary)", sign: "+" },
-                { label: "Ventas en efectivo",  value: salesByMethod.cash ?? 0, color: "var(--success)",        sign: "+" },
-                { label: "Ingresos manuales",   value: totalIn,                 color: "var(--info)",           sign: "+" },
-                { label: "Retiros manuales",    value: totalOut,                color: "var(--danger)",         sign: "−" },
-              ].map(({ label, value, color, sign }) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem" }}>
-                  <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color }}>
-                    {sign}{formatCurrency(Math.abs(value))}
-                  </span>
+            {blindArqueo ? (
+              <div style={{ padding: "12px 14px", borderRadius: "var(--radius-md)", background: "var(--info-soft)", border: "1px solid var(--info-border)", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                Contá el efectivo de la caja y cargá el monto real. Las diferencias quedan registradas para que las revise el dueño.
+              </div>
+            ) : (
+              <>
+                <div className="arqueo-declared">
+                  <div className="arqueo-declared__label">Efectivo Declarado (sistema)</div>
+                  <div className="arqueo-declared__value">{formatCurrency(efectivoTeorico)}</div>
                 </div>
-              ))}
-            </div>
 
-            <div style={{ height: 1, background: "var(--border-light)" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { label: "Fondo inicial",       value: startingCash,            color: "var(--text-secondary)", sign: "+" },
+                    { label: "Ventas en efectivo",  value: salesByMethod.cash ?? 0, color: "var(--success)",        sign: "+" },
+                    { label: "Ingresos manuales",   value: totalIn,                 color: "var(--info)",           sign: "+" },
+                    { label: "Retiros manuales",    value: totalOut,                color: "var(--danger)",         sign: "−" },
+                  ].map(({ label, value, color, sign }) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem" }}>
+                      <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color }}>
+                        {sign}{formatCurrency(Math.abs(value))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ height: 1, background: "var(--border-light)" }} />
+              </>
+            )}
 
             <div className="form-group">
               <label className="form-label">Efectivo Contado (real)</label>
@@ -610,7 +641,7 @@ export default function CajaContent() {
               </div>
             </div>
 
-            {diff !== null && (
+            {!blindArqueo && diff !== null && (
               <div className={`arqueo-diff arqueo-diff--${diff === 0 ? "ok" : diff > 0 ? "over" : "under"}`}>
                 <span>{diff === 0 ? "✓ Sin diferencias" : diff > 0 ? "Sobrante" : "Faltante"}</span>
                 <span className="arqueo-diff__value">
@@ -736,6 +767,14 @@ export default function CajaContent() {
 
                 {/* Left: session summary */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                  {blindArqueo && (
+                    <div style={{ padding: "14px 16px", borderRadius: "var(--radius-md)", background: "var(--info-soft)", border: "1px solid var(--info-border)", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                      <strong style={{ display: "block", marginBottom: 4, color: "var(--text-primary)" }}>Contá y cargá cada medio de pago</strong>
+                      Ingresá el efectivo y los montos de cada medio según lo que tengas físicamente. No se muestra el total esperado: el dueño revisa las diferencias en el historial.
+                    </div>
+                  )}
+                  {!blindArqueo && (
+                  <>
                   {/* Summary */}
                   <div>
                     <div className="caja-close-label">Resumen de sesión</div>
@@ -786,6 +825,8 @@ export default function CajaContent() {
                       </div>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
 
                 {/* Right: verificación por medio de pago */}
@@ -808,7 +849,7 @@ export default function CajaContent() {
                           <div className="caja-verify-card__hint">Contá billetes y monedas físicamente</div>
                         </div>
                         <div className="caja-verify-card__input-wrap">
-                          {d !== null && (
+                          {!blindArqueo && d !== null && (
                             <div className={`caja-verify-diff caja-verify-diff--${d === 0 ? "ok" : d > 0 ? "over" : "under"}`}>
                               {d === 0 ? "✓" : d > 0 ? `+${formatCurrency(d)}` : formatCurrency(d)}
                             </div>
@@ -842,10 +883,10 @@ export default function CajaContent() {
                         <div className="caja-verify-card__body">
                           <div className="caja-verify-card__name">{label}</div>
                           <div className="caja-verify-card__hint">{hint}</div>
-                          <div className="caja-verify-card__sistema">Sistema: {formatCurrency(sistema)}</div>
+                          {!blindArqueo && <div className="caja-verify-card__sistema">Sistema: {formatCurrency(sistema)}</div>}
                         </div>
                         <div className="caja-verify-card__input-wrap">
-                          {d !== null && (
+                          {!blindArqueo && d !== null && (
                             <div className={`caja-verify-diff caja-verify-diff--${d === 0 ? "ok" : d > 0 ? "over" : "under"}`}>
                               {d === 0 ? "✓" : d > 0 ? `+${formatCurrency(d)}` : formatCurrency(d)}
                             </div>
@@ -879,7 +920,7 @@ export default function CajaContent() {
                   </div>
 
                   {/* Total diff */}
-                  {totalCloseEntered > 0 && (
+                  {!blindArqueo && totalCloseEntered > 0 && (
                     <div className={`caja-verify-total caja-verify-total--${totalCloseDiff === 0 ? "ok" : totalCloseDiff > 0 ? "over" : "under"}`}>
                       <span className="caja-verify-total__label">
                         {totalCloseDiff === 0 ? "✓ Todo cuadra" : totalCloseDiff > 0 ? "Sobrante total" : "Faltante total"}
@@ -890,7 +931,7 @@ export default function CajaContent() {
                     </div>
                   )}
 
-                  {totalCloseEntered > 0 && totalCloseDiff !== 0 && (
+                  {!blindArqueo && totalCloseEntered > 0 && totalCloseDiff !== 0 && (
                     <div style={{ padding: "9px 12px", borderRadius: "var(--radius-md)", background: "var(--warning-soft)", border: "1px solid var(--warning-border)", display: "flex", gap: 8, alignItems: "flex-start" }}>
                       <AlertTriangle size={13} style={{ color: "var(--warning)", marginTop: 1, flexShrink: 0 }} />
                       <span style={{ fontSize: "0.73rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
