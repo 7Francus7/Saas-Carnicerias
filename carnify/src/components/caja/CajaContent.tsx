@@ -243,12 +243,14 @@ export default function CajaContent() {
 
   function openCloseModal() {
     setActionError(null);
-    setArqueoReal("");
+    // El efectivo contado en la tarjeta de arqueo de la página se traslada al
+    // cierre para no contar dos veces.
+    const countedCash = arqueoReal.trim();
     setCloseAmounts(
       blindArqueo
-        ? { cash: "", transfer: "", card: "", link: "" }
+        ? { cash: countedCash, transfer: "", card: "", link: "" }
         : {
-            cash: "",
+            cash: countedCash,
             transfer: tericoByMethod.transfer > 0 ? String(tericoByMethod.transfer) : "",
             card: tericoByMethod.card > 0 ? String(tericoByMethod.card) : "",
             link: tericoByMethod.link > 0 ? String(tericoByMethod.link) : "",

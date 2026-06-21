@@ -108,6 +108,9 @@ export default function POSContent() {
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [weightValue, setWeightValue] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<
+    { title: string; message: string; confirmLabel: string; onConfirm: () => void } | null
+  >(null);
 
   function getEffectivePrice(p: Product): number {
     if (p.discountPercent && p.discountPercent > 0) {
@@ -421,7 +424,7 @@ export default function POSContent() {
     setShowCheckoutModal(true);
   };
 
-  const handleCompleteSale = async () => {
+  const handleCompleteSale = () => {
     if (submittingSale) return;
     setCheckoutError(null);
     if (paymentSplits.length === 0) {
@@ -441,12 +444,22 @@ export default function POSContent() {
     }
 
     if (posSettings.requireConfirmOnCheckout) {
-      const confirmed = window.confirm(
-        `Confirmar cobro por ${formatCurrency(total)} para registrar la venta.`
-      );
-      if (!confirmed) return;
+      setConfirmDialog({
+        title: "Confirmar cobro",
+        message: `Vas a registrar una venta por ${formatCurrency(total)}.`,
+        confirmLabel: "Confirmar cobro",
+        onConfirm: () => {
+          setConfirmDialog(null);
+          void processSale();
+        },
+      });
+      return;
     }
 
+    void processSale();
+  };
+
+  const processSale = async () => {
     const cartItems = cart.map((item) => ({
       productId: item.productId,
       name: item.name,
@@ -712,9 +725,15 @@ export default function POSContent() {
               className="pos-cart__clear"
               onClick={() => {
                 if (cart.length === 0) return;
-                if (window.confirm(`¿Seguro que querés vaciar el carrito? Se perderán ${cart.length} ítem(s).`)) {
-                  clearCart();
-                }
+                setConfirmDialog({
+                  title: "Vaciar carrito",
+                  message: `Se quitarán ${cart.length} ítem(s) del carrito. Esta acción no se puede deshacer.`,
+                  confirmLabel: "Vaciar carrito",
+                  onConfirm: () => {
+                    clearCart();
+                    setConfirmDialog(null);
+                  },
+                });
               }}
             >
               Vaciar
@@ -1092,12 +1111,39 @@ export default function POSContent() {
               >
                 Imprimir Ticket
               </button>
-              <button 
+              <button
                 className="btn btn--ghost btn--full btn--large"
                 onClick={handleFinishSuccess}
               >
                 Finalizar sin imprimir
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirmación genérica ── */}
+      {confirmDialog && (
+        <div className="modal-overlay" onClick={() => setConfirmDialog(null)}>
+          <div className="modal modal--sm animate-in" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3 className="modal__title">{confirmDialog.title}</h3>
+              <button className="modal__close" onClick={() => setConfirmDialog(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal__content">
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
+                {confirmDialog.message}
+              </p>
+              <div className="modal-actions">
+                <button className="btn btn--ghost" onClick={() => setConfirmDialog(null)}>
+                  Cancelar
+                </button>
+                <button className="btn btn--primary" onClick={confirmDialog.onConfirm}>
+                  {confirmDialog.confirmLabel}
+                </button>
+              </div>
             </div>
           </div>
         </div>

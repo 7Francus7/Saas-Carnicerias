@@ -35,6 +35,7 @@ type TooltipEntry = { color?: string; name?: string; value?: number };
 type DashboardData = {
   revenue: number;
   orders: number;
+  productCount: number;
   ticket: number;
   clients: number;
   hasOpenCaja: boolean;
@@ -654,6 +655,104 @@ function CajaPanel({ data }: { data: DashboardData }) {
   );
 }
 
+function FirstRunGuide({ userName, hasOpenCaja }: { userName: string; hasOpenCaja: boolean }) {
+  const router = useRouter();
+  const steps = [
+    {
+      icon: <Package size={22} />,
+      cls: "pos",
+      title: "Cargá tus productos",
+      desc: "Sumá tus cortes y precios. Es lo primero para poder vender.",
+      action: "Ir a Productos",
+      href: "/productos",
+      done: false,
+    },
+    {
+      icon: <Boxes size={22} />,
+      cls: "client",
+      title: "Cargá el stock (opcional)",
+      desc: "Registrá una entrada de mercadería para llevar el control de inventario.",
+      action: "Ir a Inventario",
+      href: "/inventario",
+      done: false,
+    },
+    {
+      icon: <Wallet size={22} />,
+      cls: "pos",
+      title: "Abrí la caja del día",
+      desc: "Ingresá el efectivo inicial para poder cobrar en el punto de venta.",
+      action: hasOpenCaja ? "Caja abierta" : "Ir a Caja",
+      href: "/caja",
+      done: hasOpenCaja,
+    },
+    {
+      icon: <ShoppingCart size={22} />,
+      cls: "client",
+      title: "Empezá a vender",
+      desc: "Cobrá tu primera venta. El tablero se va a llenar de datos automáticamente.",
+      action: "Ir al Punto de Venta",
+      href: "/pos",
+      done: false,
+    },
+  ];
+
+  return (
+    <div className="page-container">
+      <div className="page-header animate-in">
+        <div className="page-header__left">
+          <div className="page-header__greeting">Hola, {userName}</div>
+          <h1 className="page-header__title">
+            Configurá tu <span>carnicería</span>
+          </h1>
+        </div>
+      </div>
+
+      <div
+        className="card animate-in animate-in-delay-1"
+        style={{ marginBottom: 20, display: "flex", gap: 14, alignItems: "flex-start" }}
+      >
+        <div style={{ padding: 12, borderRadius: 12, background: "var(--primary-soft)", color: "var(--primary)", flexShrink: 0 }}>
+          <Activity size={22} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+            Tu tablero todavía está vacío — es normal
+          </div>
+          <div style={{ fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            Seguí estos pasos y las ventas, reportes y alertas van a aparecer solas a medida que uses el sistema.
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-firstrun-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+        {steps.map((step, i) => (
+          <div key={step.title} className={`card animate-in animate-in-delay-${i + 2}`} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div className={`quick-action__icon quick-action__icon--${step.cls}`}>{step.icon}</div>
+              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                Paso {i + 1}
+              </span>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>{step.title}</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>{step.desc}</div>
+            </div>
+            <button
+              className={`btn ${step.done ? "btn--success" : "btn--primary"} btn--sm`}
+              style={{ marginTop: "auto", justifyContent: "center" }}
+              onClick={() => router.push(step.href)}
+              disabled={step.done}
+            >
+              {step.done ? "✓ " : ""}{step.action}
+              {!step.done && <ArrowUpRight size={14} />}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardContent() {
   const router = useRouter();
   const { hydrate } = useCajaStore();
@@ -696,7 +795,7 @@ export default function DashboardContent() {
   const userName = session?.user?.name?.split(" ")[0] || "Usuario";
 
   const realData = dashboardData ?? {
-    revenue: 0, orders: 0, ticket: 0, clients: 0,
+    revenue: 0, orders: 0, productCount: 0, ticket: 0, clients: 0,
     hasOpenCaja: false,
     profit: 0,
     margin: 0,
@@ -739,6 +838,10 @@ export default function DashboardContent() {
         </div>
       </div>
     );
+  }
+
+  if (dashboardData && realData.productCount === 0) {
+    return <FirstRunGuide userName={userName} hasOpenCaja={realData.hasOpenCaja} />;
   }
 
   return (

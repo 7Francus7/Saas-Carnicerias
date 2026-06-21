@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Hash, Phone, MapPin, Mail, Edit3, Trash2,
   ArrowDownLeft, ArrowUpRight, Wallet, CreditCard,
@@ -45,10 +45,45 @@ export default function ClientProfilePanel({
   const [activeTab, setActiveTab] = useState<TabType>("movements");
   const [movementFilter, setMovementFilter] = useState<MovementFilterType>("all");
   const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+  const [now] = useState(() => Date.now());
 
   const filteredMovements = movementFilter === "all"
     ? client.movements
     : client.movements.filter((m) => m.type === movementFilter);
+
+  // Inicio del período de deuda actual: la fecha en que el saldo pasó de
+  // cero (o a favor) a deuda por última vez sin volver a saldarse.
+  const debtSince = useMemo(() => {
+    if (client.balance <= 0) return null;
+    const asc = [...client.movements].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+    let start: string | null = null;
+    for (let i = 0; i < asc.length; i++) {
+      const prevBalance = i === 0 ? 0 : asc[i - 1].balanceAfter;
+      if (prevBalance <= 0 && asc[i].balanceAfter > 0) {
+        start = asc[i].date;
+      }
+    }
+    return start;
+  }, [client.movements, client.balance]);
+
+  const debtDays = debtSince
+    ? Math.floor((now - new Date(debtSince).getTime()) / 86400000)
+    : null;
+
+  const debtAgeLabel =
+    debtDays === null
+      ? null
+      : debtDays <= 0
+        ? "Debe desde hoy"
+        : debtDays === 1
+          ? "Debe desde ayer"
+          : debtDays < 30
+            ? `Debe hace ${debtDays} días`
+            : debtDays < 60
+              ? "Debe hace más de 1 mes"
+              : `Debe hace ${Math.floor(debtDays / 30)} meses`;
 
   return (
     <div className="client-details">
@@ -108,6 +143,11 @@ export default function ClientProfilePanel({
                 <div className={`summary-card__value ${client.creditLimit > 0 && client.balance > client.creditLimit ? "text-danger" : ""}`}>
                   {formatCurrency(client.balance)}
                 </div>
+                {debtAgeLabel && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.72rem", fontWeight: 600, color: debtDays !== null && debtDays >= 30 ? "var(--danger)" : "var(--text-tertiary)", marginTop: 2 }}>
+                    <History size={11} /> {debtAgeLabel}
+                  </div>
+                )}
               </>
             )}
           </div>
