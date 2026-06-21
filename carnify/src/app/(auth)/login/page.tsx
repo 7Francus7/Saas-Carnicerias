@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Store, Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react";
+import { Store, Eye, EyeOff, Mail, Lock, Loader2, RefreshCw } from "lucide-react";
 import { signIn, signInSocial } from "@/lib/auth-client";
 
 function LoginForm() {
@@ -15,6 +15,7 @@ function LoginForm() {
   const [error, setError] = useState(searchParams.get("banned") === "1" ? "Tu cuenta ha sido bloqueada. Contactá al administrador." : "");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const isSwitch = searchParams.get("switch") === "1";
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -53,6 +54,25 @@ function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
+      {isSwitch && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            background: "rgba(220,38,38,0.08)",
+            border: "1px solid rgba(220,38,38,0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 4,
+          }}
+        >
+          <RefreshCw size={16} color="#DC2626" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+            Cambio de turno — ingresá con la cuenta del nuevo empleado.
+          </span>
+        </div>
+      )}
       <div className="auth-field">
         <label className="auth-label">Email</label>
         <div className="auth-input-wrap">
@@ -63,6 +83,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tu@email.com"
+            autoFocus={isSwitch}
             required
           />
         </div>

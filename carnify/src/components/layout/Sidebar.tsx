@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, ShoppingCart, Store, Package, Beef,
   Calculator, Users, Users2, Truck, UserCog, Wallet, BarChart3,
-  Settings, LogOut, ChevronRight, Sun, Moon, Menu, X,
+  Settings, LogOut, ChevronRight, Sun, Moon, Menu, X, RefreshCw,
 } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
 import { useThemeStore } from "@/stores/useThemeStore";
@@ -40,6 +40,7 @@ export default function Sidebar() {
   const { viewingAs, stopViewAs } = useImpersonationStore();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [permissions, setPermissions] = useState<SectionKey[] | "all">("all");
   const [businessName, setBusinessName] = useState<string | null>(null);
 
@@ -87,8 +88,18 @@ export default function Sidebar() {
     .filter((section) => section.items.length > 0);
 
   const handleLogout = async () => {
+    setUserMenuOpen(false);
+    stopViewAs();
     await signOut();
     router.push("/login");
+    router.refresh();
+  };
+
+  const handleSwitchAccount = async () => {
+    setUserMenuOpen(false);
+    stopViewAs();
+    await signOut();
+    router.push("/login?switch=1");
     router.refresh();
   };
 
@@ -228,26 +239,107 @@ export default function Sidebar() {
             <span className="sidebar__link-text">{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
           </button>
 
-          <div className="sidebar__user">
-            <div className="sidebar__user-avatar">{iniciales}</div>
-            <div className="sidebar__user-info">
-              <div className="sidebar__user-name">{orgName}</div>
-              <div className="sidebar__user-role">{userName}</div>
-            </div>
+          <div className="sidebar__user" style={{ position: "relative" }}>
+            {userMenuOpen && (
+              <>
+                <div
+                  onClick={() => setUserMenuOpen(false)}
+                  aria-hidden="true"
+                  style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                />
+                <div
+                  role="menu"
+                  style={{
+                    position: "absolute",
+                    bottom: "calc(100% + 8px)",
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    background: "var(--surface, #1a1a1a)",
+                    border: "1px solid var(--border, rgba(255,255,255,0.1))",
+                    borderRadius: 10,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    role="menuitem"
+                    onClick={handleSwitchAccount}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-primary)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textAlign: "left",
+                    }}
+                  >
+                    <RefreshCw size={15} />
+                    Cambiar de cuenta
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={handleLogout}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      background: "none",
+                      border: "none",
+                      borderTop: "1px solid var(--border, rgba(255,255,255,0.08))",
+                      cursor: "pointer",
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textAlign: "left",
+                    }}
+                  >
+                    <LogOut size={15} />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </>
+            )}
+
             <button
-              onClick={handleLogout}
+              onClick={() => setUserMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+              title="Cuenta"
               style={{
-                marginLeft: "auto",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "var(--text-muted)",
-                display: "flex",
-                alignItems: "center",
+                padding: 0,
+                color: "inherit",
               }}
-              title="Cerrar sesion"
             >
-              <LogOut size={16} />
+              <div className="sidebar__user-avatar">{iniciales}</div>
+              <div className="sidebar__user-info" style={{ textAlign: "left" }}>
+                <div className="sidebar__user-name">{orgName}</div>
+                <div className="sidebar__user-role">{userName}</div>
+              </div>
+              <ChevronRight
+                size={16}
+                style={{
+                  marginLeft: "auto",
+                  color: "var(--text-muted)",
+                  transform: userMenuOpen ? "rotate(-90deg)" : "rotate(90deg)",
+                  transition: "transform 0.15s",
+                }}
+              />
             </button>
           </div>
         </div>
