@@ -35,6 +35,7 @@ type TooltipEntry = { color?: string; name?: string; value?: number };
 type DashboardData = {
   revenue: number;
   orders: number;
+  productCount: number;
   ticket: number;
   clients: number;
   hasOpenCaja: boolean;
@@ -228,16 +229,16 @@ function OperationsStrip({ data }: { data: DashboardData }) {
     <div className="ops-strip animate-in animate-in-delay-1">
       <OpsMetric
         icon={<Wallet size={20} />}
-        label="Caja del dia"
+        label="Caja del día"
         value={data.cajaToday.isOpen ? formatCurrency(data.cajaToday.totalExpected) : "Caja cerrada"}
-        detail={data.cajaToday.isOpen ? "Teorico actual sin cuenta corriente" : "Abrir caja para operar POS"}
+        detail={data.cajaToday.isOpen ? "Esperado actual sin cuenta corriente" : "Abrir caja para operar POS"}
         tone={data.cajaToday.isOpen ? "good" : "danger"}
       />
       <OpsMetric
         icon={<AlertTriangle size={20} />}
         label="Alertas de stock"
         value={`${data.stockAlerts.length}`}
-        detail={data.stockAlerts.length > 0 ? "Productos bajo minimo o sin stock" : "Inventario sin alertas criticas"}
+        detail={data.stockAlerts.length > 0 ? "Productos bajo mínimo o sin stock" : "Inventario sin alertas críticas"}
         tone={stockTone}
       />
       <OpsMetric
@@ -549,8 +550,8 @@ function TopProductsCard({ products }: { products: DashboardData["topProducts"] 
     <div className="card dashboard-list-card animate-in animate-in-delay-3">
       <div className="card__header">
         <div>
-          <div className="card__title">Productos mas vendidos</div>
-          <div className="card__subtitle">Ranking real del dia por facturacion</div>
+          <div className="card__title">Productos más vendidos</div>
+          <div className="card__subtitle">Ranking real del día por facturación</div>
         </div>
       </div>
       <div className="dashboard-list">
@@ -592,7 +593,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
       <div className="dashboard-alert-stack">
         {alerts.length === 0 ? (
           <div className="dashboard-empty-line">
-            <Package size={18} /> No hay productos bajo minimo
+            <Package size={18} /> No hay productos bajo mínimo
           </div>
         ) : alerts.slice(0, 5).map((item) => (
           <div key={item.productId} className={`dashboard-alert-row dashboard-alert-row--${item.status}`}>
@@ -600,7 +601,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
               <span>{item.emoji}</span>
               <div>
                 <strong>{item.product}</strong>
-                <p>{item.status === "out" ? "Sin stock disponible" : `Minimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
+                <p>{item.status === "out" ? "Sin stock disponible" : `Mínimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
               </div>
             </div>
             <strong>{formatNumber(item.stock)} {item.unit}</strong>
@@ -609,7 +610,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
         {slowMovers.length > 0 && (
           <div className="dashboard-slow-box">
             <div className="dashboard-slow-box__title">
-              <Activity size={16} /> Sin ventas en 30 dias
+              <Activity size={16} /> Sin ventas en 30 días
             </div>
             <div className="dashboard-slow-box__chips">
               {slowMovers.slice(0, 4).map((item) => (
@@ -628,18 +629,18 @@ function CajaPanel({ data }: { data: DashboardData }) {
     <div className="card dashboard-list-card animate-in animate-in-delay-5">
       <div className="card__header">
         <div>
-          <div className="card__title">Caja del dia</div>
-          <div className="card__subtitle">Control teorico por medio de pago</div>
+          <div className="card__title">Caja del día</div>
+          <div className="card__subtitle">Control esperado por medio de pago</div>
         </div>
       </div>
       {!data.cajaToday.isOpen ? (
         <div className="dashboard-empty-line dashboard-empty-line--danger">
-          <AlertTriangle size={18} /> Caja cerrada: el POS no puede vender
+          <AlertTriangle size={18} /> Caja cerrada — el POS no puede vender
         </div>
       ) : (
         <div className="dashboard-list">
           <div className="dashboard-cash-total">
-            <span>Total teorico</span>
+            <span>Total esperado</span>
             <strong>{formatCurrency(data.cajaToday.totalExpected)}</strong>
           </div>
           {data.cajaToday.byMethod.map((row) => (
@@ -650,6 +651,104 @@ function CajaPanel({ data }: { data: DashboardData }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function FirstRunGuide({ userName, hasOpenCaja }: { userName: string; hasOpenCaja: boolean }) {
+  const router = useRouter();
+  const steps = [
+    {
+      icon: <Package size={22} />,
+      cls: "pos",
+      title: "Cargá tus productos",
+      desc: "Sumá tus cortes y precios. Es lo primero para poder vender.",
+      action: "Ir a Productos",
+      href: "/productos",
+      done: false,
+    },
+    {
+      icon: <Boxes size={22} />,
+      cls: "client",
+      title: "Cargá el stock (opcional)",
+      desc: "Registrá una entrada de mercadería para llevar el control de inventario.",
+      action: "Ir a Inventario",
+      href: "/inventario",
+      done: false,
+    },
+    {
+      icon: <Wallet size={22} />,
+      cls: "pos",
+      title: "Abrí la caja del día",
+      desc: "Ingresá el efectivo inicial para poder cobrar en el punto de venta.",
+      action: hasOpenCaja ? "Caja abierta" : "Ir a Caja",
+      href: "/caja",
+      done: hasOpenCaja,
+    },
+    {
+      icon: <ShoppingCart size={22} />,
+      cls: "client",
+      title: "Empezá a vender",
+      desc: "Cobrá tu primera venta. El tablero se va a llenar de datos automáticamente.",
+      action: "Ir al Punto de Venta",
+      href: "/pos",
+      done: false,
+    },
+  ];
+
+  return (
+    <div className="page-container">
+      <div className="page-header animate-in">
+        <div className="page-header__left">
+          <div className="page-header__greeting">Hola, {userName}</div>
+          <h1 className="page-header__title">
+            Configurá tu <span>carnicería</span>
+          </h1>
+        </div>
+      </div>
+
+      <div
+        className="card animate-in animate-in-delay-1"
+        style={{ marginBottom: 20, display: "flex", gap: 14, alignItems: "flex-start" }}
+      >
+        <div style={{ padding: 12, borderRadius: 12, background: "var(--primary-soft)", color: "var(--primary)", flexShrink: 0 }}>
+          <Activity size={22} />
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+            Tu tablero todavía está vacío — es normal
+          </div>
+          <div style={{ fontSize: "0.88rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            Seguí estos pasos y las ventas, reportes y alertas van a aparecer solas a medida que uses el sistema.
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-firstrun-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+        {steps.map((step, i) => (
+          <div key={step.title} className={`card animate-in animate-in-delay-${i + 2}`} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div className={`quick-action__icon quick-action__icon--${step.cls}`}>{step.icon}</div>
+              <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                Paso {i + 1}
+              </span>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>{step.title}</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>{step.desc}</div>
+            </div>
+            <button
+              className={`btn ${step.done ? "btn--success" : "btn--primary"} btn--sm`}
+              style={{ marginTop: "auto", justifyContent: "center" }}
+              onClick={() => router.push(step.href)}
+              disabled={step.done}
+            >
+              {step.done ? "✓ " : ""}{step.action}
+              {!step.done && <ArrowUpRight size={14} />}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -696,7 +795,7 @@ export default function DashboardContent() {
   const userName = session?.user?.name?.split(" ")[0] || "Usuario";
 
   const realData = dashboardData ?? {
-    revenue: 0, orders: 0, ticket: 0, clients: 0,
+    revenue: 0, orders: 0, productCount: 0, ticket: 0, clients: 0,
     hasOpenCaja: false,
     profit: 0,
     margin: 0,
@@ -739,6 +838,10 @@ export default function DashboardContent() {
         </div>
       </div>
     );
+  }
+
+  if (dashboardData && realData.productCount === 0) {
+    return <FirstRunGuide userName={userName} hasOpenCaja={realData.hasOpenCaja} />;
   }
 
   return (

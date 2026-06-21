@@ -108,6 +108,9 @@ export default function POSContent() {
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [weightValue, setWeightValue] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<
+    { title: string; message: string; confirmLabel: string; onConfirm: () => void } | null
+  >(null);
 
   function getEffectivePrice(p: Product): number {
     if (p.discountPercent && p.discountPercent > 0) {
@@ -254,6 +257,7 @@ export default function POSContent() {
   // Refs for unstable values used in keydown handler (avoid listener re-registration)
   const searchRef = useRef(search);
   const pluMapRef = useRef(pluMap);
+  const productsRef = useRef(products);
   const processScanRef = useRef(processScan);
   const validateStockRef = useRef(validateStockAvailability);
   const showWeightModalRef = useRef(showWeightModal);
@@ -263,12 +267,13 @@ export default function POSContent() {
   useEffect(() => {
     searchRef.current = search;
     pluMapRef.current = pluMap;
+    productsRef.current = products;
     processScanRef.current = processScan;
     validateStockRef.current = validateStockAvailability;
     showWeightModalRef.current = showWeightModal;
     showCheckoutModalRef.current = showCheckoutModal;
     showSuccessModalRef.current = showSuccessModal;
-  }, [pluMap, processScan, search, showCheckoutModal, showSuccessModal, showWeightModal, validateStockAvailability]);
+  }, [pluMap, products, processScan, search, showCheckoutModal, showSuccessModal, showWeightModal, validateStockAvailability]);
 
   // Global keydown listener — barcode scanners + keyboard shortcuts
   useEffect(() => {
@@ -315,6 +320,31 @@ export default function POSContent() {
                 addToCart({ id: createCartItemId(bySearchPlu.id), productId: bySearchPlu.id, name: bySearchPlu.name, price: effectiveSearchPrice, quantity: 1, unit: "un", emoji: bySearchPlu.emoji });
                 setScanResult({ ok: true, product: bySearchPlu, weightKg: 1, total: effectiveSearchPrice });
                 setTimeout(() => setScanResult(null), 2000);
+              }
+            }
+            setSearch("");
+            return;
+          }
+
+          // No es un PLU: si la búsqueda por nombre deja un único producto, agregarlo
+          const query = currentSearch.trim().toLowerCase();
+          const nameMatches = productsRef.current.filter((p) => p.name.toLowerCase().includes(query));
+          if (nameMatches.length === 1) {
+            const match = nameMatches[0];
+            if (match.unit === "kg") {
+              setActiveProduct(match);
+              setWeightValue("");
+              setShowWeightModal(true);
+            } else {
+              const stockError = validateStockRef.current(match, 1);
+              if (!stockError) {
+                const effectiveSearchPrice = getEffectivePrice(match);
+                addToCart({ id: createCartItemId(match.id), productId: match.id, name: match.name, price: effectiveSearchPrice, quantity: 1, unit: "un", emoji: match.emoji });
+                setScanResult({ ok: true, product: match, weightKg: 1, total: effectiveSearchPrice });
+                setTimeout(() => setScanResult(null), 2000);
+              } else {
+                setScanResult({ ok: false, message: stockError });
+                setTimeout(() => setScanResult(null), 3000);
               }
             }
             setSearch("");
@@ -394,7 +424,7 @@ export default function POSContent() {
     setShowCheckoutModal(true);
   };
 
-  const handleCompleteSale = async () => {
+  const handleCompleteSale = () => {
     if (submittingSale) return;
     setCheckoutError(null);
     if (paymentSplits.length === 0) {
@@ -414,12 +444,22 @@ export default function POSContent() {
     }
 
     if (posSettings.requireConfirmOnCheckout) {
-      const confirmed = window.confirm(
-        `Confirmar cobro por ${formatCurrency(total)} para registrar la venta.`
-      );
-      if (!confirmed) return;
+      setConfirmDialog({
+        title: "Confirmar cobro",
+        message: `Vas a registrar una venta por ${formatCurrency(total)}.`,
+        confirmLabel: "Confirmar cobro",
+        onConfirm: () => {
+          setConfirmDialog(null);
+          void processSale();
+        },
+      });
+      return;
     }
 
+    void processSale();
+  };
+
+  const processSale = async () => {
     const cartItems = cart.map((item) => ({
       productId: item.productId,
       name: item.name,
@@ -553,6 +593,9 @@ export default function POSContent() {
               <div className="pos-scan-bar__idle">
                 <Scan size={15} />
                 <span>Listo para escanear — apuntá el lector al ticket de la balanza</span>
+                <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  F2 buscar · F8 cobrar · Esc cerrar
+                </span>
               </div>
             ) : scanResult.ok ? (
               <div className="pos-scan-bar__ok">
@@ -685,9 +728,15 @@ export default function POSContent() {
               className="pos-cart__clear"
               onClick={() => {
                 if (cart.length === 0) return;
-                if (window.confirm(`¿Seguro que querés vaciar el carrito? Se perderán ${cart.length} ítem(s).`)) {
-                  clearCart();
-                }
+                setConfirmDialog({
+                  title: "Vaciar carrito",
+                  message: `Se quitarán ${cart.length} ítem(s) del carrito. Esta acción no se puede deshacer.`,
+                  confirmLabel: "Vaciar carrito",
+                  onConfirm: () => {
+                    clearCart();
+                    setConfirmDialog(null);
+                  },
+                });
               }}
             >
               Vaciar
@@ -804,6 +853,19 @@ export default function POSContent() {
                       }}
                     >
                       {val}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 4 }}>
+                  {[0.25, 0.5, 1, 1.5, 2].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => setWeightValue(String(w))}
+                    >
+                      {w < 1 ? `${w * 1000} g` : `${w} kg`}
                     </button>
                   ))}
                 </div>
@@ -1065,12 +1127,39 @@ export default function POSContent() {
               >
                 Imprimir Ticket
               </button>
-              <button 
+              <button
                 className="btn btn--ghost btn--full btn--large"
                 onClick={handleFinishSuccess}
               >
                 Finalizar sin imprimir
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirmación genérica ── */}
+      {confirmDialog && (
+        <div className="modal-overlay" onClick={() => setConfirmDialog(null)}>
+          <div className="modal modal--sm animate-in" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__header">
+              <h3 className="modal__title">{confirmDialog.title}</h3>
+              <button className="modal__close" onClick={() => setConfirmDialog(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal__content">
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
+                {confirmDialog.message}
+              </p>
+              <div className="modal-actions">
+                <button className="btn btn--ghost" onClick={() => setConfirmDialog(null)}>
+                  Cancelar
+                </button>
+                <button className="btn btn--primary" onClick={confirmDialog.onConfirm}>
+                  {confirmDialog.confirmLabel}
+                </button>
+              </div>
             </div>
           </div>
         </div>

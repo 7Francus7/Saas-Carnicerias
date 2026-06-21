@@ -228,6 +228,7 @@ export async function getDashboardStats() {
   return {
     revenue,
     orders,
+    productCount: products.length,
     ticket: orders > 0 ? Math.round(revenue / orders) : 0,
     clients: Math.max(clients.size, orders > 0 ? 1 : 0),
     hasOpenCaja: activeSession !== null,

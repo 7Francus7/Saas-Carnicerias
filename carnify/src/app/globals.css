@@ -5447,6 +5447,29 @@ a:hover { color: var(--primary-light); }
     font-size: 0.75rem;
   }
 
+  /* Cobro: apilar resumen sobre el panel de pago */
+  .checkout-grid {
+    grid-template-columns: 1fr;
+  }
+  .checkout-payment-panel {
+    border-left: none;
+    border-top: 1px solid var(--border-light);
+  }
+  .checkout-summary-column,
+  .checkout-payment-panel {
+    padding: 20px;
+    max-height: none;
+  }
+
+  /* Caja: apilar columnas en una sola */
+  .caja-two-col {
+    grid-template-columns: 1fr;
+  }
+  .caja-close-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
   /* Touch-friendly tap targets */
   .btn {
     min-height: 44px;

@@ -27,15 +27,15 @@ const TABS: { id: TabId; label: string; Icon: React.ComponentType<{ size?: numbe
   { id: "acerca",     label: "Acerca de",      Icon: Info },
 ];
 
-const TECH_STACK = [
-  { label: "Framework",      value: "Next.js 16" },
-  { label: "UI",             value: "React 19" },
-  { label: "Estado",         value: "Zustand 5" },
-  { label: "Gráficos",       value: "Recharts 3" },
-  { label: "PDF",            value: "jsPDF 4" },
-  { label: "Iconos",         value: "Lucide React" },
-  { label: "Tipografía",     value: "Outfit · Inter · JetBrains Mono" },
-  { label: "Almacenamiento", value: "PostgreSQL via Prisma" },
+const BENEFITS = [
+  { label: "Tus datos",          value: "Guardados de forma segura en la nube" },
+  { label: "Respaldo",           value: "Copia automática, sin perder información" },
+  { label: "Acceso",             value: "Desde la compu, la tablet o el celular" },
+  { label: "Punto de venta",     value: "Cobro rápido por kilo y por unidad" },
+  { label: "Caja",               value: "Apertura, arqueo y cierre con control" },
+  { label: "Cuentas corrientes", value: "Fiados, pagos y comprobantes en PDF" },
+  { label: "Reportes",           value: "Ventas, márgenes y productos top" },
+  { label: "Soporte",            value: "Actualizaciones y ayuda incluidas" },
 ];
 
 export default function ConfigContent() {
@@ -434,7 +434,7 @@ export default function ConfigContent() {
               </div>
 
               <div className="config-about-table">
-                {TECH_STACK.map(({ label, value }) => (
+                {BENEFITS.map(({ label, value }) => (
                   <div key={label} className="config-about-row">
                     <span className="config-about-row__label">{label}</span>
                     <span className="config-about-row__value">{value}</span>
