@@ -231,7 +231,7 @@ function OperationsStrip({ data }: { data: DashboardData }) {
         icon={<Wallet size={20} />}
         label="Caja del día"
         value={data.cajaToday.isOpen ? formatCurrency(data.cajaToday.totalExpected) : "Caja cerrada"}
-        detail={data.cajaToday.isOpen ? "Teórico actual sin cuenta corriente" : "Abrir caja para operar POS"}
+        detail={data.cajaToday.isOpen ? "Esperado actual sin cuenta corriente" : "Abrir caja para operar POS"}
         tone={data.cajaToday.isOpen ? "good" : "danger"}
       />
       <OpsMetric
@@ -630,7 +630,7 @@ function CajaPanel({ data }: { data: DashboardData }) {
       <div className="card__header">
         <div>
           <div className="card__title">Caja del día</div>
-          <div className="card__subtitle">Control teórico por medio de pago</div>
+          <div className="card__subtitle">Control esperado por medio de pago</div>
         </div>
       </div>
       {!data.cajaToday.isOpen ? (
@@ -640,7 +640,7 @@ function CajaPanel({ data }: { data: DashboardData }) {
       ) : (
         <div className="dashboard-list">
           <div className="dashboard-cash-total">
-            <span>Total teorico</span>
+            <span>Total esperado</span>
             <strong>{formatCurrency(data.cajaToday.totalExpected)}</strong>
           </div>
           {data.cajaToday.byMethod.map((row) => (

@@ -593,6 +593,9 @@ export default function POSContent() {
               <div className="pos-scan-bar__idle">
                 <Scan size={15} />
                 <span>Listo para escanear — apuntá el lector al ticket de la balanza</span>
+                <span style={{ marginLeft: "auto", fontSize: "0.72rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  F2 buscar · F8 cobrar · Esc cerrar
+                </span>
               </div>
             ) : scanResult.ok ? (
               <div className="pos-scan-bar__ok">
@@ -850,6 +853,19 @@ export default function POSContent() {
                       }}
                     >
                       {val}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 4 }}>
+                  {[0.25, 0.5, 1, 1.5, 2].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => setWeightValue(String(w))}
+                    >
+                      {w < 1 ? `${w * 1000} g` : `${w} kg`}
                     </button>
                   ))}
                 </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Wallet, ArrowDownCircle, ArrowUpCircle, Lock, Unlock,
   X, DollarSign, CreditCard, Smartphone, UserPlus,
@@ -147,7 +147,16 @@ export default function CajaContent() {
   const avgTicket = txCount > 0 ? Math.round(totalSales / txCount) : 0;
 
   // UI state
-  const [openAmount,  setOpenAmount]  = useState("50000");
+  const [openAmount,  setOpenAmount]  = useState("");
+  // Prellena el fondo inicial con el de la última sesión (una sola vez).
+  const openPrefilled = useRef(false);
+  useEffect(() => {
+    if (!openPrefilled.current && !isOpen && history.length > 0) {
+      openPrefilled.current = true;
+      const last = history[0]?.startingCash;
+      if (last !== undefined && last > 0) setOpenAmount(String(last));
+    }
+  }, [history, isOpen]);
   const [showMove,    setShowMove]    = useState(false);
   const [moveType,    setMoveType]    = useState<"in" | "out">("in");
   const [moveAmount,  setMoveAmount]  = useState("");
@@ -355,7 +364,7 @@ export default function CajaContent() {
                   type="number"
                   className="arqueo-input"
                   style={{ fontSize: "1.5rem" }}
-                  placeholder="0"
+                  placeholder="Ej: 10000"
                   value={openAmount}
                   onChange={(e) => setOpenAmount(e.target.value)}
                 />
@@ -448,7 +457,7 @@ export default function CajaContent() {
           <div className="stat-card__label">
             {blindArqueo
               ? "Ventas registradas en esta sesión"
-              : `Efectivo Total en Caja · ${txCount} ventas · Ticket promedio ${formatCurrency(avgTicket)}`}
+              : `Efectivo esperado en caja · ${txCount} ventas · Ticket promedio ${formatCurrency(avgTicket)}`}
           </div>
         </div>
       </div>
@@ -606,7 +615,7 @@ export default function CajaContent() {
             ) : (
               <>
                 <div className="arqueo-declared">
-                  <div className="arqueo-declared__label">Efectivo Declarado (sistema)</div>
+                  <div className="arqueo-declared__label">Efectivo esperado (según sistema)</div>
                   <div className="arqueo-declared__value">{formatCurrency(efectivoTeorico)}</div>
                 </div>
 

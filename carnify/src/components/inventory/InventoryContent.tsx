@@ -40,6 +40,21 @@ type InventoryResponse = {
   unit: string;
 }[];
 
+// Separa kg y unidades: sumarlos en un solo número no tiene sentido.
+function sumMonthByUnit(rows: Movement[], types: string[]) {
+  const now = new Date();
+  let kg = 0;
+  let un = 0;
+  rows.forEach((movement) => {
+    const d = new Date(movement.date);
+    if (types.includes(movement.type) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      if (movement.unit === "kg") kg += movement.quantity;
+      else un += movement.quantity;
+    }
+  });
+  return { kg, un };
+}
+
 export default function InventoryContent() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [inventory, setInventory] = useState<InventoryItemRow[]>([]);
@@ -89,19 +104,15 @@ export default function InventoryContent() {
     [inventory, search]
   );
 
-  const currentMonthIn = useMemo(() => {
-    const now = new Date();
-    return movements
-      .filter((movement) => ["entry", "cancellation"].includes(movement.type) && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
-      .reduce((acc, movement) => acc + movement.quantity, 0);
-  }, [movements]);
+  const currentMonthIn = useMemo(() => sumMonthByUnit(movements, ["entry", "cancellation"]), [movements]);
+  const currentMonthOut = useMemo(() => sumMonthByUnit(movements, ["exit", "sale"]), [movements]);
 
-  const currentMonthOut = useMemo(() => {
-    const now = new Date();
-    return movements
-      .filter((movement) => ["exit", "sale"].includes(movement.type) && new Date(movement.date).getMonth() === now.getMonth() && new Date(movement.date).getFullYear() === now.getFullYear())
-      .reduce((acc, movement) => acc + movement.quantity, 0);
-  }, [movements]);
+  const fmtQtyByUnit = (q: { kg: number; un: number }) => {
+    const parts: string[] = [];
+    if (q.kg > 0) parts.push(`${formatNumber(Math.round(q.kg * 10) / 10)} kg`);
+    if (q.un > 0) parts.push(`${formatNumber(Math.round(q.un))} u`);
+    return parts.length > 0 ? parts.join(" · ") : "0";
+  };
 
   const lowStockCount = useMemo(
     () => inventory.filter((item) => item.quantity <= stockAlertThreshold).length,
@@ -216,14 +227,14 @@ export default function InventoryContent() {
           <div className="stat-card__icon stat-card__icon--green"><ArrowDownLeft size={20} /></div>
           <div className="stat-card__content">
             <span className="stat-card__label">Ingresos del Mes</span>
-            <span className="stat-card__value">{formatNumber(Math.round(currentMonthIn * 10) / 10)} kg/un</span>
+            <span className="stat-card__value" style={{ fontSize: "1.15rem" }}>{fmtQtyByUnit(currentMonthIn)}</span>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-card__icon stat-card__icon--danger"><ArrowUpRight size={20} /></div>
           <div className="stat-card__content">
             <span className="stat-card__label">Salidas del Mes</span>
-            <span className="stat-card__value">{formatNumber(Math.round(currentMonthOut * 10) / 10)} kg/un</span>
+            <span className="stat-card__value" style={{ fontSize: "1.15rem" }}>{fmtQtyByUnit(currentMonthOut)}</span>
           </div>
         </div>
       </div>
@@ -474,7 +485,7 @@ export default function InventoryContent() {
         .inventory-search { position: relative; flex: 1; max-width: 400px; }
         .inventory-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
         .inventory-search__input { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 10px 10px 10px 40px; color: var(--text-primary); outline: none; }
-        .inventory-table-container { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; }
+        .inventory-table-container { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .inventory-table { width: 100%; border-collapse: collapse; text-align: left; }
         .inventory-table th { padding: 16px 24px; background: var(--bg-secondary); color: var(--text-tertiary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
         .inventory-table td { padding: 16px 24px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); font-size: 0.9rem; }
