@@ -89,7 +89,7 @@ export default function ResetPasswordForm() {
                     className="auth-input auth-input--with-icon"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Minimo 8 caracteres"
+                    placeholder="Mínimo 8 caracteres"
                     required
                   />
                   <button type="button" className="auth-eye" onClick={() => setShowPassword((value) => !value)}>

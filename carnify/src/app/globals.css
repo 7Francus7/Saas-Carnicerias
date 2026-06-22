@@ -190,6 +190,7 @@ a:hover { color: var(--primary-light); }
 
 .main-content {
   flex: 1;
+  min-width: 0; /* permite encoger: contenido ancho (tablas) scrollea en vez de inflar el layout */
   margin-left: var(--sidebar-width);
   min-height: 100vh;
   transition: margin-left var(--transition-base);
@@ -254,8 +255,7 @@ a:hover { color: var(--primary-light); }
   flex-direction: column;
   z-index: 100;
   transition: width var(--transition-base);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   box-shadow: 4px 0 24px rgba(0,0,0,0.02);
 }
 
@@ -293,6 +293,9 @@ a:hover { color: var(--primary-light); }
 
 .sidebar__nav {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px 10px;
   display: flex;
   flex-direction: column;
@@ -398,6 +401,7 @@ a:hover { color: var(--primary-light); }
 }
 
 .sidebar__footer {
+  flex-shrink: 0;
   padding: 12px 10px;
   border-top: 1px solid var(--border-light);
 }
@@ -3636,6 +3640,10 @@ a:hover { color: var(--primary-light); }
 }
 
 .pos-summary__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
   font-size: 1.5rem;
   font-weight: 900;
   color: var(--text-primary);

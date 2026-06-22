@@ -462,7 +462,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
               <span>{item.emoji}</span>
               <div>
                 <strong>{item.product}</strong>
-                <p>{item.status === "out" ? "Sin stock disponible" : `Minimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
+                <p>{item.status === "out" ? "Sin stock disponible" : `Mínimo sugerido ${formatNumber(item.threshold)} ${item.unit}`}</p>
               </div>
             </div>
             <strong>{formatNumber(item.stock)} {item.unit}</strong>

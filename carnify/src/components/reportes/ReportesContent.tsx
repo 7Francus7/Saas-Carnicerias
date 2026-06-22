@@ -152,7 +152,7 @@ export default function ReportesContent() {
       <div className="page-header animate-in">
         <div className="page-header__left">
           <div className="page-header__greeting">Finanzas</div>
-          <h1 className="page-header__title">Reportes y <span>Analisis</span></h1>
+          <h1 className="page-header__title">Reportes y <span>Análisis</span></h1>
           {dateLabel && (
             <div style={{ marginTop: 4, fontSize: "0.82rem", color: "var(--primary)", fontWeight: 600, textTransform: "capitalize" }}>
               {dateLabel}
@@ -247,7 +247,7 @@ export default function ReportesContent() {
         <div className="card animate-in animate-in-delay-2">
           <div className="card__header">
             <div>
-              <div className="card__title">Evolucion de Ventas</div>
+              <div className="card__title">Evolución de Ventas</div>
               <div className="card__subtitle">
                 {period === "custom" || period === "hoy" ? "Por hora" : period === "semana" ? "Por dia" : "Por semana"}
               </div>
@@ -279,7 +279,7 @@ export default function ReportesContent() {
           <div className="card__header">
             <div>
               <div className="card__title">Medios de Pago</div>
-              <div className="card__subtitle">Distribucion del periodo</div>
+              <div className="card__subtitle">Distribución del período</div>
             </div>
           </div>
           {chartsReady && (
@@ -324,8 +324,8 @@ export default function ReportesContent() {
         <div className="card animate-in animate-in-delay-2">
           <div className="card__header">
             <div>
-              <div className="card__title">Ventas por Categoria</div>
-              <div className="card__subtitle">Participacion en el periodo</div>
+              <div className="card__title">Ventas por Categoría</div>
+              <div className="card__subtitle">Participación en el período</div>
             </div>
           </div>
           {reportData.categories.length === 0 ? (
@@ -347,8 +347,8 @@ export default function ReportesContent() {
         <div className="card animate-in animate-in-delay-3">
           <div className="card__header">
             <div>
-              <div className="card__title">Productos Mas Vendidos</div>
-              <div className="card__subtitle">Ranking del periodo</div>
+              <div className="card__title">Productos Más Vendidos</div>
+              <div className="card__subtitle">Ranking del período</div>
             </div>
             {reportData.topProducts.length > 5 && (
               <button className="btn btn--ghost btn--sm" onClick={() => setShowAllProducts((v) => !v)}>
@@ -411,7 +411,7 @@ export default function ReportesContent() {
         <div className="card__header">
           <div>
             <div className="card__title">Resumen Semanal</div>
-            <div className="card__subtitle">Ultimos 7 dias - comparativa por jornada</div>
+            <div className="card__subtitle">Últimos 7 días - comparativa por jornada</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: "var(--text-tertiary)" }}>
             <Calendar size={13} /> Semana actual

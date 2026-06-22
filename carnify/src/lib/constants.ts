@@ -47,7 +47,7 @@ export const NAV_ITEMS: NavSection[] = [
     section: "Sistema",
     items: [
       { label: "Empleados",     icon: "Users2",   href: "/empleados", badge: null, sectionKey: "empleados" },
-      { label: "Configuracion", icon: "Settings", href: "/config",    badge: null, sectionKey: "config" },
+      { label: "Configuración", icon: "Settings", href: "/config",    badge: null, sectionKey: "config" },
     ],
   },
 ];

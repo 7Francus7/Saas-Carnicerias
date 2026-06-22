@@ -182,8 +182,8 @@ export default function InventoryContent() {
     <div className="inventory-container">
       <div className="inventory-header">
         <div className="inventory-title">
-          <h1>Gestion de Inventario</h1>
-          <p>Control de stock, ingresos y salidas de mercaderia</p>
+          <h1>Gestión de Inventario</h1>
+          <p>Control de stock, ingresos y salidas de mercadería</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button className="btn btn--secondary" onClick={() => openMovementModal("exit")}>
@@ -208,7 +208,7 @@ export default function InventoryContent() {
         <div className="stat-card">
           <div className="stat-card__icon stat-card__icon--orange"><AlertTriangle size={20} /></div>
           <div className="stat-card__content">
-            <span className="stat-card__label">Stock Critico</span>
+            <span className="stat-card__label">Stock Crítico</span>
             <span className="stat-card__value">{lowStockCount}</span>
           </div>
         </div>
@@ -471,9 +471,9 @@ export default function InventoryContent() {
         .inventory-tab--active { color: var(--primary); }
         .inventory-tab--active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--primary); }
         .inventory-filters { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; }
-        .inventory-search { position: relative; flex: 1; max-width: 400px; }
-        .inventory-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-        .inventory-search__input { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 10px 10px 10px 40px; color: var(--text-primary); outline: none; }
+        .inventory-search { flex: 1; max-width: 400px; display: flex; align-items: center; gap: 8px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 0 12px; }
+        .inventory-search__icon { color: var(--text-muted); flex-shrink: 0; }
+        .inventory-search__input { flex: 1; width: 100%; background: none; border: none; padding: 10px 0; color: var(--text-primary); outline: none; }
         .inventory-table-container { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); overflow: hidden; }
         .inventory-table { width: 100%; border-collapse: collapse; text-align: left; }
         .inventory-table th { padding: 16px 24px; background: var(--bg-secondary); color: var(--text-tertiary); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }

@@ -447,7 +447,8 @@ export default function CostosContent() {
           background: var(--bg-card);
           border: 1px solid var(--border-light);
           border-radius: var(--radius-lg);
-          overflow: hidden;
+          overflow-x: auto;
+          overflow-y: hidden;
         }
 
         .costos-table {
