@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, ShoppingBag, Receipt, Users,
@@ -9,10 +9,6 @@ import {
   AlertTriangle, Wallet, BarChart3, Activity,
   Boxes
 } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis,
-  CartesianGrid, Tooltip, PieChart, Pie, Cell,
-} from "recharts";
 import { formatCurrency, formatNumber } from "@/lib/constants";
 import { useCajaStore, mapDbSessionToStore } from "@/stores/useCajaStore";
 import { getCurrentSession } from "@/actions/caja";
@@ -30,8 +26,6 @@ type RecentSale = {
   payment: string;
   client: string | null;
 };
-type TooltipEntry = { color?: string; name?: string; value?: number };
-
 type DashboardData = {
   revenue: number;
   orders: number;
@@ -105,75 +99,37 @@ function labelPayment(method: string) {
   return PAYMENT_LABELS[method] ?? method;
 }
 
-function CustomTooltip({ active, payload, label }: {
-  active?: boolean;
-  payload?: TooltipEntry[];
-  label?: string;
+// Mini grafico de barras 100% CSS — sin recharts ni JS de medicion.
+// Render instantaneo y casi cero costo de CPU (clave en PCs de gama baja).
+function MiniBars({ points, variant }: {
+  points: { label: string; value: number }[];
+  variant?: "week";
 }) {
-  if (active && payload && payload.length) {
-    return (
-      <div style={{
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-md)",
-        padding: "10px 14px",
-        fontSize: "0.8rem",
-        boxShadow: "var(--shadow-lg)",
-      }}>
-        <p style={{ color: "var(--text-tertiary)", marginBottom: 4 }}>{label}</p>
-        {payload.map((entry, idx: number) => (
-          <p key={idx} style={{ color: entry.color, fontWeight: 600 }}>
-            {entry.name === "ventas" ? formatCurrency(entry.value ?? 0) : entry.value}
-          </p>
-        ))}
-      </div>
-    );
+  if (points.length === 0) {
+    return <div className="bar-chart__empty">Sin datos todavia</div>;
   }
-  return null;
-}
-
-function MeasuredChart({
-  height,
-  children,
-}: {
-  height: number;
-  children: (size: { width: number; height: number }) => React.ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
-    const updateWidth = (nextWidth: number) => {
-      const roundedWidth = Math.round(nextWidth);
-      setWidth((prev) => (prev === roundedWidth ? prev : roundedWidth));
-    };
-
-    updateWidth(element.getBoundingClientRect().width);
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      updateWidth(entry.contentRect.width);
-    });
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
+  const max = Math.max(1, ...points.map((p) => p.value));
   return (
-    <div ref={ref} className="chart-container" style={{ height }}>
-      {width > 0 && children({ width, height })}
+    <div className="bar-chart">
+      {points.map((p, idx) => (
+        <div className="bar-chart__col" key={`${p.label}-${idx}`}>
+          <div className="bar-chart__track">
+            <div
+              className={`bar-chart__bar${variant === "week" ? " bar-chart__bar--week" : ""}`}
+              style={{ height: `${Math.round((p.value / max) * 100)}%` }}
+              title={`${p.label}: ${formatCurrency(p.value)}`}
+            />
+          </div>
+          <span className="bar-chart__label">{p.label}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function StatCard({ stat, type, delay }: {
+function StatCard({ stat, type }: {
   stat: { value: number; trend: number; trendDirection: "up" | "down"; label: string };
   type: "revenue" | "orders" | "ticket" | "clients";
-  delay: number;
 }) {
   const icons = {
     revenue: <DollarSign size={20} />,
@@ -187,7 +143,7 @@ function StatCard({ stat, type, delay }: {
     : formatCurrency(stat.value);
 
   return (
-    <div className={`stat-card stat-card--${type} animate-in animate-in-delay-${delay}`}>
+    <div className={`stat-card stat-card--${type}`}>
       <div className="stat-card__top">
         <div className={`stat-card__icon stat-card__icon--${type}`}>{icons[type]}</div>
         <div className={`stat-card__trend stat-card__trend--${stat.trendDirection}`} style={{ visibility: stat.trend === 0 ? "hidden" : "visible" }}>
@@ -225,7 +181,7 @@ function OperationsStrip({ data }: { data: DashboardData }) {
   const marginTone = data.costCoverage === 0 ? "warn" : data.margin >= 25 ? "good" : "info";
 
   return (
-    <div className="ops-strip animate-in animate-in-delay-1">
+    <div className="ops-strip">
       <OpsMetric
         icon={<Wallet size={20} />}
         label="Caja del dia"
@@ -261,7 +217,8 @@ function OperationsStrip({ data }: { data: DashboardData }) {
 function LiveClock() {
   const [time, setTime] = useState<Date>(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
+    // Tick por minuto (no por segundo): menos re-renders en CPU de gama baja.
+    const t = setInterval(() => setTime(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
   const tz = "America/Argentina/Buenos_Aires";
@@ -270,7 +227,7 @@ function LiveClock() {
       <Clock size={16} style={{ color: "var(--text-tertiary)" }} />
       <div>
         <div className="live-clock__time" suppressHydrationWarning>
-          {time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: tz })}
+          {time.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: tz })}
         </div>
         <div className="live-clock__date" style={{ textTransform: "capitalize" }} suppressHydrationWarning>
           {time.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
@@ -280,125 +237,47 @@ function LiveClock() {
   );
 }
 
-function WeeklyChart({ data, ready }: { data: WeeklyPoint[]; ready: boolean }) {
-  const displayData = data.length > 0 ? data : 
-    [{ day: "lun", ventas: 0 }, { day: "mar", ventas: 0 }, { day: "mié", ventas: 0 },
-     { day: "jue", ventas: 0 }, { day: "vie", ventas: 0 }, { day: "sáb", ventas: 0 }, { day: "dom", ventas: 0 }];
-
+function WeeklyChart({ data }: { data: WeeklyPoint[] }) {
+  const points = data.map((d) => ({ label: d.day, value: d.ventas }));
   return (
-    <div className="card animate-in animate-in-delay-3">
+    <div className="card">
       <div className="card__header">
         <div>
           <div className="card__title">Ventas Semanales</div>
           <div className="card__subtitle">Últimos 7 días</div>
         </div>
       </div>
-      {ready && (
-        <MeasuredChart height={280}>
-          {({ width, height }) => (
-            <AreaChart width={width} height={height} data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="weekGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-              <XAxis
-                dataKey="day"
-                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                axisLine={{ stroke: "var(--border-light)" }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="ventas"
-                stroke="#3B82F6"
-                strokeWidth={2.5}
-                fill="url(#weekGradient)"
-                dot={false}
-                activeDot={{ r: 5, stroke: "#3B82F6", strokeWidth: 2, fill: "var(--bg-card)" }}
-              />
-            </AreaChart>
-          )}
-        </MeasuredChart>
-      )}
+      <MiniBars points={points} variant="week" />
     </div>
   );
 }
 
-function SalesChart({ data, ready }: { data: ChartPoint[]; ready: boolean }) {
-  const displayData = data.length > 0 ? data : [{ hour: "08:00", ventas: 0 }, { hour: "20:00", ventas: 0 }];
-
+function SalesChart({ data }: { data: ChartPoint[] }) {
+  const points = data.map((d) => ({ label: d.hour, value: d.ventas }));
   return (
-    <div className="card animate-in animate-in-delay-2">
+    <div className="card">
       <div className="card__header">
         <div>
           <div className="card__title">Ventas Hoy</div>
           <div className="card__subtitle">Evolución por hora</div>
         </div>
       </div>
-      {ready && (
-        <MeasuredChart height={280}>
-          {({ width, height }) => (
-            <AreaChart width={width} height={height} data={displayData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#DC2626" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#DC2626" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
-              <XAxis
-                dataKey="hour"
-                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                axisLine={{ stroke: "var(--border-light)" }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="ventas"
-                stroke="#DC2626"
-                strokeWidth={2.5}
-                fill="url(#salesGradient)"
-                dot={false}
-                activeDot={{ r: 5, stroke: "#DC2626", strokeWidth: 2, fill: "var(--bg-card)" }}
-              />
-            </AreaChart>
-          )}
-        </MeasuredChart>
-      )}
+      <MiniBars points={points} />
     </div>
   );
 }
 
-function RightPanel({ paymentData, ready }: { paymentData: PaymentSlice[]; ready: boolean }) {
+function RightPanel({ paymentData }: { paymentData: PaymentSlice[] }) {
   const router = useRouter();
   const actions = [
     { icon: <ShoppingCart size={18} />, cls: "pos", title: "Nueva Venta", desc: "Abrir punto de venta", href: "/pos" },
     { icon: <UserPlus size={18} />, cls: "client", title: "Nuevo Cliente", desc: "Registrar cliente", href: "/clientes" },
   ];
 
-  const emptyData = [{ method: "Sin registros", amount: 1, color: "var(--border-light)", percentage: 100 }];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Quick Actions */}
-      <div className="card animate-in animate-in-delay-3">
+      <div className="card">
         <div className="card__header">
           <div className="card__title">Acciones Rápidas</div>
         </div>
@@ -420,51 +299,34 @@ function RightPanel({ paymentData, ready }: { paymentData: PaymentSlice[]; ready
         </div>
       </div>
 
-      {/* Payment Breakdown */}
-      <div className="card animate-in animate-in-delay-4">
+      {/* Payment Breakdown — barras horizontales CSS (sin torta recharts) */}
+      <div className="card">
         <div className="card__header">
           <div className="card__title">Medios de Pago</div>
           <div className="card__subtitle">Distribución del día</div>
         </div>
-        {ready && (
-          <MeasuredChart height={130}>
-            {({ width, height }) => (
-              <PieChart width={width} height={height}>
-                <Pie
-                  data={paymentData.length > 0 ? paymentData : emptyData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={38}
-                  outerRadius={56}
-                  paddingAngle={paymentData.length > 0 ? 3 : 0}
-                  dataKey="amount"
-                  stroke="none"
-                >
-                  {(paymentData.length > 0 ? paymentData : emptyData).map((entry, idx) => (
-                    <Cell key={idx} fill={entry.color} stroke="transparent" />
-                  ))}
-                </Pie>
-              </PieChart>
-            )}
-          </MeasuredChart>
-        )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
           {paymentData.length === 0 && (
             <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem", width: "100%" }}>
               Aún no hay ventas en la caja actual
             </div>
           )}
           {paymentData.map((p) => (
-            <div key={p.method} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.8rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
-                <span style={{ color: "var(--text-secondary)" }}>{p.method}</span>
+            <div key={p.method}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "0.8rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
+                  <span style={{ color: "var(--text-secondary)" }}>{p.method}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem" }}>{p.percentage}%</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-primary)", minWidth: 80, textAlign: "right" }}>
+                    {formatCurrency(p.amount)}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ color: "var(--text-tertiary)", fontSize: "0.75rem" }}>{p.percentage}%</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-primary)", minWidth: 80, textAlign: "right" }}>
-                  {formatCurrency(p.amount)}
-                </span>
+              <div className="pay-bar">
+                <div className="pay-bar__fill" style={{ width: `${p.percentage}%`, background: p.color }} />
               </div>
             </div>
           ))}
@@ -477,7 +339,7 @@ function RightPanel({ paymentData, ready }: { paymentData: PaymentSlice[]; ready
 function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
   const router = useRouter();
   return (
-    <div className="card animate-in animate-in-delay-2">
+    <div className="card">
       <div className="card__header">
         <div>
           <div className="card__title">Últimas Ventas</div>
@@ -546,7 +408,7 @@ function RecentSalesCard({ sales }: { sales: RecentSale[] }) {
 
 function TopProductsCard({ products }: { products: DashboardData["topProducts"] }) {
   return (
-    <div className="card dashboard-list-card animate-in animate-in-delay-3">
+    <div className="card dashboard-list-card">
       <div className="card__header">
         <div>
           <div className="card__title">Productos mas vendidos</div>
@@ -582,7 +444,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
   slowMovers: DashboardData["slowMovers"];
 }) {
   return (
-    <div className="card dashboard-list-card animate-in animate-in-delay-4">
+    <div className="card dashboard-list-card">
       <div className="card__header">
         <div>
           <div className="card__title">Alertas operativas</div>
@@ -625,7 +487,7 @@ function StockAlertsCard({ alerts, slowMovers }: {
 
 function CajaPanel({ data }: { data: DashboardData }) {
   return (
-    <div className="card dashboard-list-card animate-in animate-in-delay-5">
+    <div className="card dashboard-list-card">
       <div className="card__header">
         <div>
           <div className="card__title">Caja del dia</div>
@@ -717,7 +579,6 @@ export default function DashboardContent() {
   const router = useRouter();
   const { hydrate } = useCajaStore();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [chartsReady, setChartsReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -725,10 +586,9 @@ export default function DashboardContent() {
     setLoading(true);
     setLoadError(null);
     try {
-      const s = await getCurrentSession();
-      if (s) hydrate(mapDbSessionToStore(s), []);
-      else hydrate(null, []);
-      const stats = await getDashboardStats();
+      // Las dos consultas son independientes: en paralelo carga mas rapido.
+      const [s, stats] = await Promise.all([getCurrentSession(), getDashboardStats()]);
+      hydrate(s ? mapDbSessionToStore(s) : null, []);
       setDashboardData(stats as DashboardData);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "No se pudo cargar el dashboard.");
@@ -738,10 +598,6 @@ export default function DashboardContent() {
   }, [hydrate]);
 
   useEffect(() => { void loadSession(); }, [loadSession]);
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setChartsReady(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
 
   const { data: session } = useSession();
 
@@ -796,7 +652,7 @@ export default function DashboardContent() {
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="page-header animate-in">
+      <div className="page-header">
         <div className="page-header__left">
           <div className="page-header__greeting">
             {greeting()}, {userName}
@@ -822,20 +678,20 @@ export default function DashboardContent() {
 
       {/* Stats */}
       <div className="stats-grid">
-        <StatCard stat={{ label: "Ventas del Día", value: realData.revenue, trend: 0, trendDirection: "up" }} type="revenue" delay={1} />
-        <StatCard stat={{ label: "Transacciones", value: realData.orders, trend: 0, trendDirection: "up" }} type="orders" delay={2} />
-        <StatCard stat={{ label: "Ticket Promedio", value: realData.ticket, trend: 0, trendDirection: "up" }} type="ticket" delay={3} />
-        <StatCard stat={{ label: "Clientes Atendidos", value: realData.clients, trend: 0, trendDirection: "up" }} type="clients" delay={4} />
+        <StatCard stat={{ label: "Ventas del Día", value: realData.revenue, trend: 0, trendDirection: "up" }} type="revenue" />
+        <StatCard stat={{ label: "Transacciones", value: realData.orders, trend: 0, trendDirection: "up" }} type="orders" />
+        <StatCard stat={{ label: "Ticket Promedio", value: realData.ticket, trend: 0, trendDirection: "up" }} type="ticket" />
+        <StatCard stat={{ label: "Clientes Atendidos", value: realData.clients, trend: 0, trendDirection: "up" }} type="clients" />
       </div>
 
       {/* Left: Charts | Right: Quick Actions + Payment + Weekly */}
       <div className="dashboard-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SalesChart data={realData.hourlySales} ready={chartsReady} />
+          <SalesChart data={realData.hourlySales} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <RightPanel paymentData={realData.paymentBreakdown} ready={chartsReady} />
-          <WeeklyChart data={realData.weeklySales} ready={chartsReady} />
+          <RightPanel paymentData={realData.paymentBreakdown} />
+          <WeeklyChart data={realData.weeklySales} />
         </div>
       </div>
 

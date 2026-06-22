@@ -1013,6 +1013,76 @@ a:hover { color: var(--primary-light); }
   width: 100%;
 }
 
+/* ── Mini bar charts (sin JS, reemplazan recharts en el dashboard) ── */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 220px;
+  padding: 8px 4px 0;
+}
+
+.bar-chart__col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar-chart__track {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar-chart__bar {
+  width: 100%;
+  max-width: 34px;
+  min-height: 3px;
+  border-radius: 6px 6px 0 0;
+  background: var(--primary);
+}
+
+.bar-chart__bar--week {
+  background: #3b82f6;
+}
+
+.bar-chart__label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar-chart__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Barra horizontal para medios de pago */
+.pay-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-light);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.pay-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
 /* ── Tables ── */
 .table-wrapper {
   overflow-x: auto;
