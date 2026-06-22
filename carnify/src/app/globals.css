@@ -3569,6 +3569,46 @@ a:hover { color: var(--primary-light); }
   transition: all 0.15s ease;
 }
 
+/* Stepper de cantidad (+/-) para items por unidad */
+.pos-qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.pos-qty-stepper__btn {
+  background: var(--bg-card);
+  border: none;
+  color: var(--text-secondary);
+  width: 26px;
+  height: 26px;
+  border-radius: calc(var(--radius-md) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.pos-qty-stepper__btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.pos-qty-stepper__value {
+  min-width: 22px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
 .pos-cart-item__remove:hover {
   background: var(--danger);
   color: white;

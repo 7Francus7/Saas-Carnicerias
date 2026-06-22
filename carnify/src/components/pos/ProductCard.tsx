@@ -9,7 +9,7 @@ interface ProductCardProps {
   stockUnit: string;
   stockAlertThreshold: number;
   discountPrice: number | null;
-  onClick: () => void;
+  onSelect: (product: Product) => void;
 }
 
 function ProductCardInner({
@@ -19,12 +19,12 @@ function ProductCardInner({
   stockUnit,
   stockAlertThreshold,
   discountPrice,
-  onClick,
+  onSelect,
 }: ProductCardProps) {
   return (
     <div
       className="pos-card"
-      onClick={onClick}
+      onClick={() => onSelect(product)}
       style={
         isOutOfStock
           ? { opacity: 0.6, cursor: "not-allowed" }

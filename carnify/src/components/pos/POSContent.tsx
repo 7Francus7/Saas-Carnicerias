@@ -5,6 +5,7 @@ import {
   Search, ShoppingCart, Trash2, X,
   Scan, CheckCircle, AlertCircle,
   Package, BadgeDollarSign, Scale,
+  Plus, Minus,
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES, PAYMENT_METHODS,
@@ -72,8 +73,21 @@ type ScanResult =
   | { ok: false; message: string }
   | null;
 
+// Precio efectivo (con descuento vigente). Funcion pura a nivel modulo:
+// no depende de estado, evita recrearla en cada render.
+function getEffectivePrice(p: Product): number {
+  if (p.discountPercent && p.discountPercent > 0) {
+    if (p.discountEndDate) {
+      const end = new Date(p.discountEndDate);
+      if (end < new Date()) return p.price; // Vencido — sin descuento
+    }
+    return p.price * (1 - p.discountPercent / 100);
+  }
+  return p.price;
+}
+
 export default function POSContent() {
-  const { cart, addToCart, removeFromCart, clearCart, total } = usePOSStore();
+  const { cart, addToCart, removeFromCart, updateQuantity, clearCart, total } = usePOSStore();
   const products = useProductsStore((s) => s.products);
   const setProducts = useProductsStore((s) => s.setProducts);
   const { currentSession, hydrate } = useCajaStore();
@@ -108,17 +122,6 @@ export default function POSContent() {
   const [scanResult, setScanResult] = useState<ScanResult>(null);
   const [weightValue, setWeightValue] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
-
-  function getEffectivePrice(p: Product): number {
-    if (p.discountPercent && p.discountPercent > 0) {
-      if (p.discountEndDate) {
-        const end = new Date(p.discountEndDate);
-        if (end < new Date()) return p.price; // Expired — no discount
-      }
-      return p.price * (1 - p.discountPercent / 100);
-    }
-    return p.price;
-  }
 
   useEffect(() => {
     loadSession();
@@ -343,13 +346,19 @@ export default function POSContent() {
   }, [addToCart, clearCart, createCartItemId]);
 
   // ── Product helpers ──────────────────────────────────────────────────────
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === "todos" || p.category.toLowerCase() === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Memoizado: solo recalcula al cambiar productos, busqueda o categoria.
+  // Busca por nombre y por PLU. La query se normaliza una sola vez.
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return products.filter((p) => {
+      const matchesSearch = q === "" || p.name.toLowerCase().includes(q) || p.plu.includes(q);
+      const matchesCategory = selectedCategory === "todos" || p.category.toLowerCase() === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, search, selectedCategory]);
 
-  const handleProductClick = (product: Product) => {
+  // Estable (useCallback): evita romper el memo de ProductCard en cada render.
+  const handleProductClick = useCallback((product: Product) => {
     const stockError = validateStockAvailability(product, 1);
     if (product.unit === "un" && stockError) {
       setScanResult({ ok: false, message: stockError });
@@ -364,7 +373,7 @@ export default function POSContent() {
     } else {
       addToCart({ id: createCartItemId(product.id), productId: product.id, name: product.name, price: getEffectivePrice(product), quantity: 1, unit: "un", emoji: product.emoji });
     }
-  };
+  }, [validateStockAvailability, addToCart, createCartItemId]);
 
   const confirmWeight = () => {
     if (!activeProduct) return;
@@ -379,6 +388,22 @@ export default function POSContent() {
       addToCart({ id: createCartItemId(activeProduct.id), productId: activeProduct.id, name: activeProduct.name, price: getEffectivePrice(activeProduct), quantity: weight, unit: "kg", emoji: activeProduct.emoji });
       setShowWeightModal(false);
     }
+  };
+
+  // Stepper de cantidad para items por unidad (no aplica a kg).
+  const incrementCartItem = (item: typeof cart[number]) => {
+    const available = getAvailableStock(item.productId);
+    if (available !== null && available <= 0) {
+      setScanResult({ ok: false, message: `Stock insuficiente para ${item.name}` });
+      setTimeout(() => setScanResult(null), 3000);
+      return;
+    }
+    updateQuantity(item.id, item.quantity + 1);
+  };
+
+  const decrementCartItem = (item: typeof cart[number]) => {
+    if (item.quantity <= 1) removeFromCart(item.id);
+    else updateQuantity(item.id, item.quantity - 1);
   };
 
   const openCheckout = () => {
@@ -576,7 +601,7 @@ export default function POSContent() {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Buscar producto... (F2)"
+              placeholder="Buscar producto o PLU... (F2)"
               className="pos-search__input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -646,7 +671,7 @@ export default function POSContent() {
                 stockUnit={inventoryByProduct[product.id]?.unit ?? product.unit}
                 stockAlertThreshold={posSettings.stockAlertThreshold}
                 discountPrice={effectivePrice !== product.price ? effectivePrice : null}
-                onClick={() => handleProductClick(product)}
+                onSelect={handleProductClick}
               />
             );
           })}
@@ -715,6 +740,25 @@ export default function POSContent() {
                     </div>
                   </div>
                   <div className="pos-cart-item__actions">
+                    {item.unit !== "kg" && (
+                      <div className="pos-qty-stepper">
+                        <button
+                          className="pos-qty-stepper__btn"
+                          onClick={() => decrementCartItem(item)}
+                          aria-label="Quitar una unidad"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="pos-qty-stepper__value">{item.quantity}</span>
+                        <button
+                          className="pos-qty-stepper__btn"
+                          onClick={() => incrementCartItem(item)}
+                          aria-label="Agregar una unidad"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    )}
                     <div className="pos-cart-item__total">
                       {formatCurrency(item.price * item.quantity)}
                     </div>
