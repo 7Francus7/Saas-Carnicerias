@@ -5,7 +5,7 @@ import {
   Search, ShoppingCart, Trash2, X,
   Scan, CheckCircle, AlertCircle,
   Package, BadgeDollarSign, Scale,
-  Plus, Minus,
+  Plus, Minus, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
   PRODUCT_CATEGORIES, PAYMENT_METHODS,
@@ -253,6 +253,31 @@ export default function POSContent() {
   }, [addToCart, createCartItemId, pluMap, validateStockAvailability]);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Scroll de la barra de categorias (flechas izq/der) ──────────────────
+  const categoriesRef = useRef<HTMLDivElement | null>(null);
+  const [catScroll, setCatScroll] = useState({ left: false, right: false });
+
+  const updateCatArrows = useCallback(() => {
+    const el = categoriesRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 4;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setCatScroll((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
+  }, []);
+
+  const scrollCategories = (direction: 1 | -1) => {
+    categoriesRef.current?.scrollBy({ left: direction * 260, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    updateCatArrows();
+    const el = categoriesRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(updateCatArrows);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateCatArrows, products.length]);
 
   // Refs for unstable values used in keydown handler (avoid listener re-registration)
   const searchRef = useRef(search);
@@ -631,24 +656,46 @@ export default function POSContent() {
             </div>
           </div>
 
-          <div className="pos-categories">
-            <button
-              className={`pos-category ${selectedCategory === "todos" ? "pos-category--active" : ""}`}
-              onClick={() => setSelectedCategory("todos")}
-            >
-              Todos
-              <span>{categoryCounts.todos ?? 0}</span>
-            </button>
-            {PRODUCT_CATEGORIES.map((cat) => (
+          <div className="pos-categories-wrap">
+            {catScroll.left && (
               <button
-                key={cat.id}
-                className={`pos-category ${selectedCategory === cat.label.toLowerCase() ? "pos-category--active" : ""}`}
-                onClick={() => setSelectedCategory(cat.label.toLowerCase())}
+                type="button"
+                className="pos-cat-arrow pos-cat-arrow--left"
+                onClick={() => scrollCategories(-1)}
+                aria-label="Ver categorias anteriores"
               >
-                {cat.emoji} {cat.label}
-                <span>{categoryCounts[cat.label.toLowerCase()] ?? 0}</span>
+                <ChevronLeft size={18} />
               </button>
-            ))}
+            )}
+            <div className="pos-categories" ref={categoriesRef} onScroll={updateCatArrows}>
+              <button
+                className={`pos-category ${selectedCategory === "todos" ? "pos-category--active" : ""}`}
+                onClick={() => setSelectedCategory("todos")}
+              >
+                Todos
+                <span>{categoryCounts.todos ?? 0}</span>
+              </button>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  className={`pos-category ${selectedCategory === cat.label.toLowerCase() ? "pos-category--active" : ""}`}
+                  onClick={() => setSelectedCategory(cat.label.toLowerCase())}
+                >
+                  {cat.emoji} {cat.label}
+                  <span>{categoryCounts[cat.label.toLowerCase()] ?? 0}</span>
+                </button>
+              ))}
+            </div>
+            {catScroll.right && (
+              <button
+                type="button"
+                className="pos-cat-arrow pos-cat-arrow--right"
+                onClick={() => scrollCategories(1)}
+                aria-label="Ver mas categorias"
+              >
+                <ChevronRight size={18} />
+              </button>
+            )}
           </div>
         </div>
 

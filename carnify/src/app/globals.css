@@ -3263,14 +3263,45 @@ a:hover { color: var(--primary-light); }
 }
 .pos-operation-metric--danger svg { color: var(--danger); }
 
+.pos-categories-wrap {
+  position: relative;
+}
+
 .pos-categories {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 16px;
   scrollbar-width: none;
+  scroll-behavior: smooth;
 }
 .pos-categories::-webkit-scrollbar { display: none; }
+
+/* Flechas para scrollear la barra de categorias */
+.pos-cat-arrow {
+  position: absolute;
+  top: 22px;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.pos-cat-arrow:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.pos-cat-arrow--left { left: -6px; }
+.pos-cat-arrow--right { right: -6px; }
 
 .pos-category {
   background: var(--bg-card);
