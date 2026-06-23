@@ -90,50 +90,51 @@ export async function openCaja(startingCash: number) {
 export async function closeCaja(realAmounts: Record<string, number>) {
   const { tenantId, userId } = await requireTenantAndSection("caja");
 
-  const session = await prisma.cajaSession.findFirst({
-    where: { organizationId: tenantId, closedAt: null },
-    include: {
-      sales: { where: { status: "active" }, include: { splits: true } },
-      transactions: true,
-    },
-  });
-  if (!session) throw new Error("No hay caja abierta");
-
-  // Calculate teorico and diff.
-  // Fiado (cuenta corriente) is NOT a reconcilable amount — it never lands in caja
-  // nor in a bank account, so it must be excluded from the theoretical totals.
-  // Including it produced a false "faltante" equal to the fiado total on every close.
-  const tericoByMethod: Record<string, number> = { cash: session.startingCash };
-  session.sales.forEach((sale: { method: string; total: number; splits: { method: string; amount: number }[] }) => {
-    if (sale.splits.length > 0) {
-      sale.splits.forEach((sp: { method: string; amount: number }) => {
-        if (sp.method === "fiado") return;
-        tericoByMethod[sp.method] = (tericoByMethod[sp.method] ?? 0) + sp.amount;
-      });
-    } else {
-      if (sale.method === "fiado") return;
-      tericoByMethod[sale.method] = (tericoByMethod[sale.method] ?? 0) + sale.total;
-    }
-  });
-  session.transactions.forEach((t: { type: string; amount: number }) => {
-    tericoByMethod["cash"] = (tericoByMethod["cash"] ?? 0) + (t.type === "in" ? t.amount : -t.amount);
-  });
-
-  const diffByMethod: Record<string, number> = {};
-  let diffTotal = 0;
-  Object.keys({ ...tericoByMethod, ...realAmounts }).forEach((k) => {
-    const real = realAmounts[k] ?? 0;
-    const teorico = tericoByMethod[k] ?? 0;
-    diffByMethod[k] = real - teorico;
-    diffTotal += real - teorico;
-  });
-  diffTotal = Math.round(diffTotal * 100) / 100;
-
   await prisma.$transaction(async (tx) => {
-    const current = await tx.cajaSession.findFirst({
-      where: { id: session.id, closedAt: null },
+    // M3: leer la sesión + ventas + movimientos DENTRO de la transacción de cierre,
+    // para que el teórico refleje exactamente el estado al momento de cerrar. Antes
+    // se calculaba sobre una lectura previa a la $transaction y una venta concurrente
+    // que entrara entre el cálculo y el cierre quedaba fuera del teórico persistido.
+    // Esta misma lectura (closedAt: null) cubre el doble-cierre: si otra caja ya cerró,
+    // devuelve null → "No hay caja abierta".
+    const session = await tx.cajaSession.findFirst({
+      where: { organizationId: tenantId, closedAt: null },
+      include: {
+        sales: { where: { status: "active" }, include: { splits: true } },
+        transactions: true,
+      },
     });
-    if (!current) throw new Error("La caja ya fue cerrada por otro usuario");
+    if (!session) throw new Error("No hay caja abierta");
+
+    // Calculate teorico and diff.
+    // Fiado (cuenta corriente) is NOT a reconcilable amount — it never lands in caja
+    // nor in a bank account, so it must be excluded from the theoretical totals.
+    // Including it produced a false "faltante" equal to the fiado total on every close.
+    const tericoByMethod: Record<string, number> = { cash: session.startingCash };
+    session.sales.forEach((sale: { method: string; total: number; splits: { method: string; amount: number }[] }) => {
+      if (sale.splits.length > 0) {
+        sale.splits.forEach((sp: { method: string; amount: number }) => {
+          if (sp.method === "fiado") return;
+          tericoByMethod[sp.method] = (tericoByMethod[sp.method] ?? 0) + sp.amount;
+        });
+      } else {
+        if (sale.method === "fiado") return;
+        tericoByMethod[sale.method] = (tericoByMethod[sale.method] ?? 0) + sale.total;
+      }
+    });
+    session.transactions.forEach((t: { type: string; amount: number }) => {
+      tericoByMethod["cash"] = (tericoByMethod["cash"] ?? 0) + (t.type === "in" ? t.amount : -t.amount);
+    });
+
+    const diffByMethod: Record<string, number> = {};
+    let diffTotal = 0;
+    Object.keys({ ...tericoByMethod, ...realAmounts }).forEach((k) => {
+      const real = realAmounts[k] ?? 0;
+      const teorico = tericoByMethod[k] ?? 0;
+      diffByMethod[k] = real - teorico;
+      diffTotal += real - teorico;
+    });
+    diffTotal = Math.round(diffTotal * 100) / 100;
 
     await tx.cajaSession.update({
       where: { id: session.id },
