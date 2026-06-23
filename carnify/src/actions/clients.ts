@@ -98,17 +98,22 @@ export async function addPayment(
   const { tenantId } = await requireTenantAndSection("clientes");
 
   const movement = await prisma.$transaction(async (tx) => {
-    // Read balance inside transaction to prevent race condition
+    // Validar existencia/tenant antes de tocar el balance
     const client = await tx.client.findFirst({
       where: { id: clientId, organizationId: tenantId },
+      select: { id: true, name: true },
     });
     if (!client) throw new Error("Cliente no encontrado");
 
+    // Decremento atómico para evitar lost update bajo concurrencia (cobro + venta simultáneos).
     // Allow saldo a favor (negative balance = credit)
-    const newBalance = client.balance - amount;
+    const updatedClient = await tx.client.update({
+      where: { id: clientId },
+      data: { balance: { decrement: amount }, lastActivity: new Date() },
+    });
     // creditLimit 0 = sin límite
-    const newStatus = newBalance <= 0 ? "active"
-      : client.creditLimit <= 0 || newBalance <= client.creditLimit ? "active"
+    const newStatus = updatedClient.balance <= 0 ? "active"
+      : updatedClient.creditLimit <= 0 || updatedClient.balance <= updatedClient.creditLimit ? "active"
       : "overdue";
 
     const mov = await tx.clientMovement.create({
@@ -117,20 +122,15 @@ export async function addPayment(
         date: new Date(),
         type: "payment",
         amount,
-        balanceAfter: newBalance,
+        balanceAfter: updatedClient.balance,
         description: note || "Pago",
         paymentMethod: method,
       },
     });
 
-    await tx.client.update({
-      where: { id: clientId },
-      data: {
-        balance: newBalance,
-        status: newStatus,
-        lastActivity: new Date(),
-      },
-    });
+    if (updatedClient.status !== newStatus) {
+      await tx.client.update({ where: { id: clientId }, data: { status: newStatus } });
+    }
 
     // C1: un cobro en efectivo entra al cajón físico. Registrar ingreso de caja
     // en la sesión abierta para que el teórico de cierre lo contemple.
@@ -164,10 +164,19 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
   await prisma.$transaction(async (tx) => {
     const client = await tx.client.findFirst({
       where: { id: clientId, organizationId: tenantId },
+      select: { id: true },
     });
     if (!client) throw new Error("Cliente no encontrado");
 
-    const newBalance = client.balance + amount;
+    // Incremento atómico para evitar lost update bajo concurrencia.
+    const updatedClient = await tx.client.update({
+      where: { id: clientId },
+      data: { balance: { increment: amount }, lastActivity: new Date() },
+    });
+    const newStatus =
+      updatedClient.creditLimit > 0 && updatedClient.balance > updatedClient.creditLimit
+        ? "overdue"
+        : "active";
 
     await tx.clientMovement.create({
       data: {
@@ -175,19 +184,14 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
         date: new Date(),
         type: "sale",
         amount,
-        balanceAfter: newBalance,
+        balanceAfter: updatedClient.balance,
         description,
       },
     });
 
-    await tx.client.update({
-      where: { id: clientId },
-      data: {
-        balance: newBalance,
-        status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
-        lastActivity: new Date(),
-      },
-    });
+    if (updatedClient.status !== newStatus) {
+      await tx.client.update({ where: { id: clientId }, data: { status: newStatus } });
+    }
   });
 
   revalidatePath("/clientes");

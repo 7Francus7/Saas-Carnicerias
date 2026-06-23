@@ -299,30 +299,34 @@ export async function recordSale(
     if (fiadoAmount > 0 && clientId) {
       const client = await tx.client.findFirst({
         where: { id: clientId, organizationId: tenantId },
+        select: { id: true },
       });
       if (!client) {
         throw new Error("El cliente seleccionado no existe o fue eliminado. Cancelá la venta y seleccioná un cliente válido.");
       }
-      const newBalance = client.balance + fiadoAmount;
+      // Incremento atómico para evitar lost update bajo concurrencia (2 cajas / retry).
+      const updatedClient = await tx.client.update({
+        where: { id: clientId },
+        data: { balance: { increment: fiadoAmount }, lastActivity: new Date() },
+      });
+      const newStatus =
+        updatedClient.creditLimit > 0 && updatedClient.balance > updatedClient.creditLimit
+          ? "overdue"
+          : "active";
       await tx.clientMovement.create({
         data: {
           clientId,
           date: new Date(),
           type: "sale",
           amount: fiadoAmount,
-          balanceAfter: newBalance,
+          balanceAfter: updatedClient.balance,
           description: `Venta #${newSale.id.slice(-6)}`,
           ticketId: newSale.id,
         },
       });
-      await tx.client.update({
-        where: { id: clientId },
-        data: {
-          balance: newBalance,
-          status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
-          lastActivity: new Date(),
-        },
-      });
+      if (updatedClient.status !== newStatus) {
+        await tx.client.update({ where: { id: clientId }, data: { status: newStatus } });
+      }
     }
 
     for (const item of parsedItems) {
@@ -688,28 +692,31 @@ export async function cancelSale(saleId: string, reason: string) {
     // Revert fiado debt if applicable
     const fiadoSplit = sale.splits.find((s) => s.method === "fiado");
     if (fiadoSplit && sale.clientId) {
-      const client = await tx.client.findUnique({ where: { id: sale.clientId } });
+      const client = await tx.client.findUnique({ where: { id: sale.clientId }, select: { id: true } });
       if (client) {
-        const newBalance = client.balance - fiadoSplit.amount;
+        // Decremento atómico para evitar lost update bajo concurrencia.
+        const updatedClient = await tx.client.update({
+          where: { id: sale.clientId },
+          data: { balance: { decrement: fiadoSplit.amount }, lastActivity: new Date() },
+        });
+        const newStatus =
+          updatedClient.creditLimit > 0 && updatedClient.balance > updatedClient.creditLimit
+            ? "overdue"
+            : "active";
         await tx.clientMovement.create({
           data: {
             clientId: sale.clientId,
             date: new Date(),
             type: "cancellation",
             amount: -fiadoSplit.amount,
-            balanceAfter: newBalance,
+            balanceAfter: updatedClient.balance,
             description: `Anulación venta #${saleId.slice(-6)} — ${reason.trim()}`,
             ticketId: saleId,
           },
         });
-        await tx.client.update({
-          where: { id: sale.clientId },
-          data: {
-            balance: newBalance,
-            status: client.creditLimit > 0 && newBalance > client.creditLimit ? "overdue" : "active",
-            lastActivity: new Date(),
-          },
-        });
+        if (updatedClient.status !== newStatus) {
+          await tx.client.update({ where: { id: sale.clientId }, data: { status: newStatus } });
+        }
       }
     }
 
