@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 import { requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { startOfDay, addDays, getARTHour, getARTDayOfWeek } from "@/lib/dateUtils";
 
 const SplitSchema = z.object({ method: z.string(), amount: z.number().finite().nonnegative() });
 const CartItemSchema = z.object({
@@ -389,130 +388,6 @@ export async function recordSale(
   revalidatePath("/reportes");
   revalidatePath("/clientes");
   return sale;
-}
-
-export async function getDashboardStats() {
-  const { tenantId } = await requireTenantAndSection("dashboard");
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = addDays(todayStart, 1);
-
-  const sessions = await prisma.cajaSession.findMany({
-    where: {
-      organizationId: tenantId,
-      closedAt: null,
-    },
-    include: {
-      sales: { where: { status: "active" }, include: { splits: true } },
-      transactions: true,
-    },
-    orderBy: { openedAt: "desc" },
-    take: 1,
-  });
-
-  const closedToday = await prisma.cajaSession.findMany({
-    where: {
-      organizationId: tenantId,
-      closedAt: { gte: todayStart, lt: todayEnd },
-    },
-    include: {
-      sales: { where: { status: "active" }, include: { splits: true } },
-    },
-  });
-
-  let totalRevenue = 0;
-  let totalOrders = 0;
-  const clientIds = new Set<string>();
-  const hourlyMap: Record<string, number> = {};
-  const paymentMap: Record<string, number> = {};
-
-  const processSales = (sales: typeof sessions[0]['sales']) => {
-    for (const sale of sales) {
-      // Filter by actual sale timestamp — prevents showing yesterday's sales if caja was left open
-      const ts = new Date(sale.timestamp);
-      if (ts < todayStart || ts >= todayEnd) continue;
-
-      totalRevenue += sale.total;
-      totalOrders += 1;
-      if (sale.clientId) clientIds.add(sale.clientId);
-
-      const h = getARTHour(ts).toString().padStart(2, "0") + ":00";
-      hourlyMap[h] = (hourlyMap[h] ?? 0) + sale.total;
-
-      if (sale.splits.length > 0) {
-        sale.splits.forEach((sp) => { paymentMap[sp.method] = (paymentMap[sp.method] ?? 0) + sp.amount; });
-      } else {
-        paymentMap[sale.method] = (paymentMap[sale.method] ?? 0) + sale.total;
-      }
-    }
-  };
-
-  const activeSession = sessions[0] ?? null;
-  if (activeSession) processSales(activeSession.sales);
-  for (const s of closedToday) processSales(s.sales);
-
-  // Weekly data (last 7 days)
-  const weekStart = addDays(todayStart, -6);
-  const weekSessions = await prisma.cajaSession.findMany({
-    where: {
-      organizationId: tenantId,
-      openedAt: { gte: weekStart },
-    },
-    include: { sales: { where: { status: "active" } } },
-  });
-
-  const dayMap: Record<string, number> = {};
-  const dayLabels = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  for (let i = 0; i < 7; i++) {
-    const dayStart = addDays(weekStart, i);
-    const dayEnd = addDays(dayStart, 1);
-    const dow = getARTDayOfWeek(dayStart);
-    dayMap[dayLabels[dow]] = 0;
-    for (const s of weekSessions) {
-      for (const sale of s.sales) {
-        const saleTs = new Date(sale.timestamp);
-        if (saleTs >= dayStart && saleTs < dayEnd) {
-          dayMap[dayLabels[dow]] += sale.total;
-        }
-      }
-    }
-  }
-
-  const paymentColors: Record<string, string> = {
-    cash: "#22C55E", transfer: "#3B82F6", card: "#F59E0B",
-    link: "#A855F7", fiado: "#EF4444", mixed: "#8B5CF6",
-  };
-
-  return {
-    revenue: totalRevenue,
-    orders: totalOrders,
-    ticket: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
-    clients: Math.max(clientIds.size, totalOrders > 0 ? 1 : 0),
-    hasOpenCaja: activeSession !== null,
-    hourlySales: Object.entries(hourlyMap)
-      .map(([hour, val]) => ({ hour, ventas: val }))
-      .sort((a, b) => a.hour.localeCompare(b.hour)),
-    weeklySales: Object.entries(dayMap).map(([day, ventas]) => ({ day, ventas })),
-    paymentBreakdown: Object.entries(paymentMap)
-      .map(([method, amount]) => ({ method, amount, percentage: totalRevenue > 0 ? parseFloat(((amount / totalRevenue) * 100).toFixed(1)) : 0, color: paymentColors[method] ?? "#888" }))
-      .sort((a, b) => b.amount - a.amount),
-    recentSales: (activeSession?.sales ?? [])
-      .filter((v) => {
-        const ts = new Date(v.timestamp);
-        return ts >= todayStart && ts < todayEnd;
-      })
-      .slice(-5).reverse()
-      .map((v) => ({
-        id: `TK-${v.id.substring(0, 4).toUpperCase()}`,
-        time: new Date(v.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        items: v.itemCount || 1,
-        total: v.total,
-        payment: v.method,
-        client: v.clientName || null,
-      })),
-    stockAlerts: [],
-    topProducts: [],
-  };
 }
 
 export async function getSalesForPeriod(start: Date, end: Date) {
