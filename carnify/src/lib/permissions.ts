@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { headers } from "next/headers";
@@ -11,30 +12,39 @@ export type PermissionResult = {
   sections: SectionKey[] | "all";
 };
 
-export async function getUserPermissions(): Promise<PermissionResult | null> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.session.activeOrganizationId) return null;
+// Deduplicacion por request: cache() de React memoiza el resultado dentro de
+// un mismo render/request server. Si en un request se resuelven varios guards
+// (p.ej. requireSectionAccess + requireRole), el lookup de sesion + member +
+// permisos corre una sola vez. NO es cache global ni persiste entre
+// requests/usuarios: la memoizacion se descarta al terminar cada request y la
+// entrada depende de headers() (cookies del request actual), asi que nunca
+// cruza usuarios. Comportamiento funcional identico al previo.
+export const getUserPermissions = cache(
+  async (): Promise<PermissionResult | null> => {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.session.activeOrganizationId) return null;
 
-  const tenantId = session.session.activeOrganizationId;
-  const member = await prisma.member.findFirst({
-    where: { userId: session.user.id, organizationId: tenantId },
-  });
-
-  if (!member) return null;
-
-  let sections: SectionKey[] | "all";
-  // Solo la cuenta oficial (owner) ve todo; el resto queda limitado a sus secciones.
-  if (member.role === "owner") {
-    sections = "all";
-  } else {
-    const perms = await prisma.employeePermissions.findUnique({
-      where: { memberId: member.id },
+    const tenantId = session.session.activeOrganizationId;
+    const member = await prisma.member.findFirst({
+      where: { userId: session.user.id, organizationId: tenantId },
     });
-    sections = (perms?.sections ?? []) as SectionKey[];
-  }
 
-  return { userId: session.user.id, tenantId, role: member.role, sections };
-}
+    if (!member) return null;
+
+    let sections: SectionKey[] | "all";
+    // Solo la cuenta oficial (owner) ve todo; el resto queda limitado a sus secciones.
+    if (member.role === "owner") {
+      sections = "all";
+    } else {
+      const perms = await prisma.employeePermissions.findUnique({
+        where: { memberId: member.id },
+      });
+      sections = (perms?.sections ?? []) as SectionKey[];
+    }
+
+    return { userId: session.user.id, tenantId, role: member.role, sections };
+  }
+);
 
 export async function requireSectionAccess(
   section: SectionKey
