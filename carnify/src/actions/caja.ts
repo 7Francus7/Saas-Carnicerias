@@ -154,14 +154,39 @@ export async function closeCaja(realAmounts: Record<string, number>) {
   revalidatePath("/reportes");
 }
 
+// P2002 = unique constraint. Detecta el choque del índice de idempotencyKey sin
+// acoplar a la clase de error del client generado.
+function isIdempotencyConflict(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: string }).code === "P2002" &&
+    JSON.stringify((e as { meta?: unknown }).meta ?? "").includes("idempotencyKey")
+  );
+}
+
 export async function recordSale(
   total: number,
   splits: z.infer<typeof SplitSchema>[],
   items: z.infer<typeof CartItemSchema>[],
   clientId?: string,
   clientName?: string,
+  idempotencyKey?: string,
 ) {
   const { tenantId } = await requireTenantAndSection("pos");
+
+  // Idempotencia: si este intento de cobro ya quedó registrado (retry de red,
+  // reconexión, doble submit), devolver la venta existente sin crear otra.
+  const idemKey = idempotencyKey?.trim() || undefined;
+  if (idemKey) {
+    const existing = await prisma.sale.findFirst({
+      where: { idempotencyKey: idemKey, session: { organizationId: tenantId } },
+      include: { splits: true, items: true },
+    });
+    if (existing) return existing;
+  }
+
   const parsedSale = RecordSaleSchema.parse({ total, splits, items, clientId, clientName });
   const parsedSplits = parsedSale.splits;
   const parsedItems = parsedSale.items;
@@ -219,7 +244,7 @@ export async function recordSale(
     throw new Error("Selecciona un cliente para registrar una venta fiada");
   }
 
-  const sale = await prisma.$transaction(async (tx) => {
+  const runSale = () => prisma.$transaction(async (tx) => {
     const [txSession, txSettings] = await Promise.all([
       tx.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
       tx.businessSettings.findUnique({ where: { organizationId: tenantId }, select: { enforceStock: true } }),
@@ -278,6 +303,7 @@ export async function recordSale(
         itemCount: parsedItems.length,
         clientId: clientId ?? null,
         clientName: clientName ?? null,
+        idempotencyKey: idemKey ?? null,
         splits: {
           create: parsedSplits.map((s) => ({ method: s.method, amount: s.amount })),
         },
@@ -382,6 +408,23 @@ export async function recordSale(
 
     return newSale;
   });
+
+  let sale: Awaited<ReturnType<typeof runSale>>;
+  try {
+    sale = await runSale();
+  } catch (e) {
+    // Carrera: dos requests con el mismo idempotencyKey. El índice único aborta
+    // el segundo (rollback completo: stock, fiado, todo). Devolvemos la venta
+    // que ya creó el primero en vez de propagar el error.
+    if (idemKey && isIdempotencyConflict(e)) {
+      const existing = await prisma.sale.findFirst({
+        where: { idempotencyKey: idemKey, session: { organizationId: tenantId } },
+        include: { splits: true, items: true },
+      });
+      if (existing) return existing;
+    }
+    throw e;
+  }
 
   revalidatePath("/caja");
   revalidatePath("/");

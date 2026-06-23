@@ -232,6 +232,7 @@ model Sale {
   cancelledAt    DateTime?
   cancelledById  String?
   cancelReason   String?
+  idempotencyKey String?            @unique
   splits         SalePaymentSplit[]
   items          SaleItem[]
 

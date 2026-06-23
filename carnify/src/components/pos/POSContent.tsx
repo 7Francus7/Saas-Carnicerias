@@ -116,6 +116,10 @@ export default function POSContent() {
   const [clientSearch, setClientSearch] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [submittingSale, setSubmittingSale] = useState(false);
+  // Idempotencia: key estable por intento de cobro. Se conserva ante un fallo
+  // (reintento reusa el mismo key → el server no duplica la venta) y se limpia
+  // solo cuando la venta fue exitosa, para que el próximo carrito tome uno nuevo.
+  const idempotencyKeyRef = useRef<string>("");
   const [inventoryByProduct, setInventoryByProduct] = useState<Record<string, { quantity: number; unit: string }>>({});
   const [businessName, setBusinessName] = useState("Carnify");
   const [posSettings, setPosSettings] = useState<PosSettings>(DEFAULT_POS);
@@ -441,6 +445,9 @@ export default function POSContent() {
         },
       ]);
     }
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
     setShowCheckoutModal(true);
   };
 
@@ -486,7 +493,8 @@ export default function POSContent() {
         paymentSplits,
         cartItems,
         selectedClientId || undefined,
-        selectedClient?.name
+        selectedClient?.name,
+        idempotencyKeyRef.current || undefined
       );
 
       await loadSession();
@@ -515,6 +523,8 @@ export default function POSContent() {
     setClientSearch("");
     setCheckoutError(null);
     setShowSuccessModal(false);
+    // Venta confirmada: descartar el key para que el próximo cobro genere uno nuevo.
+    idempotencyKeyRef.current = "";
   };
 
   const handlePrintTicket = () => {
