@@ -17,6 +17,13 @@ Si pusheás primero, Vercel deploya código que lee/escribe columnas (`idempoten
 falla**. Las migraciones son additivas, así que aplicarlas primero **no rompe** el código
 viejo que está corriendo (su Prisma client simplemente ignora las columnas nuevas). Sin downtime.
 
+> **Nota — commit de performance (P0, sin migración):** este deploy también incluye el
+> commit `513c98d` (Sidebar persistente vía route group `(app)`, `loading.tsx`, dedup de
+> permisos con `React.cache()`). **No toca el schema ni agrega migraciones** — es solo
+> reestructura de rutas y código. El orden crítico de abajo **no cambia**: igual hay que
+> aplicar las 3 migraciones pendientes ANTES de pushear, porque el push lleva ambos cambios
+> (migraciones de negocio + performance) en el mismo deploy de Vercel.
+
 ---
 
 ## 0. Pre-vuelo
