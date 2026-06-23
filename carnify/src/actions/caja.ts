@@ -324,7 +324,7 @@ export async function recordSale(
 
     if (fiadoAmount > 0 && clientId) {
       const client = await tx.client.findFirst({
-        where: { id: clientId, organizationId: tenantId },
+        where: { id: clientId, organizationId: tenantId, active: true },
         select: { id: true },
       });
       if (!client) {

@@ -298,6 +298,7 @@ model Client {
   creditLimit    Float            @default(0)
   balance        Float            @default(0)
   status         String           @default("active")
+  active         Boolean          @default(true)
   lastActivity   DateTime         @default(now())
   createdAt      DateTime         @default(now())
   movements      ClientMovement[]

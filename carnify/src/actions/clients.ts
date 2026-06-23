@@ -19,7 +19,7 @@ const ClientSchema = z.object({
 export async function getClients() {
   const { tenantId } = await requireTenantAndSection("clientes");
   return prisma.client.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, active: true },
     include: {
       movements: { orderBy: { date: "desc" }, take: 100 },
       periods: { orderBy: { closedAt: "desc" } },
@@ -41,7 +41,7 @@ export async function getClientMovements(clientId: string, offset = 0, limit = 5
 export async function getClientsForPos() {
   const { tenantId } = await requireTenantAndSection("pos");
   return prisma.client.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, active: true },
     select: {
       id: true,
       name: true,
@@ -80,12 +80,20 @@ export async function deleteClient(id: string) {
   const { tenantId } = await requireTenantAndSection("clientes");
   const client = await prisma.client.findFirst({ where: { id, organizationId: tenantId } });
   if (!client) return;
-  if (client.balance > 0) {
+  // Bloquear si hay plata en juego (deuda o saldo a favor): regularizar antes de archivar.
+  if (client.balance !== 0) {
     throw new Error(
-      `Este cliente tiene deuda pendiente de $${client.balance.toFixed(2)}. Saldá la cuenta antes de eliminar.`
+      client.balance > 0
+        ? `Este cliente tiene deuda pendiente de $${client.balance.toFixed(2)}. Saldá la cuenta antes de desactivar.`
+        : `Este cliente tiene saldo a favor de $${Math.abs(client.balance).toFixed(2)}. Regularizá la cuenta antes de desactivar.`
     );
   }
-  await prisma.client.deleteMany({ where: { id, organizationId: tenantId } });
+  // Soft-delete: marcar inactivo. NO se borra historial de ventas, pagos,
+  // movimientos ni períodos; el cliente sigue resolviendo en vistas históricas.
+  await prisma.client.updateMany({
+    where: { id, organizationId: tenantId },
+    data: { active: false },
+  });
   revalidatePath("/clientes");
 }
 
@@ -163,7 +171,7 @@ export async function addSaleToAccount(clientId: string, amount: number, descrip
 
   await prisma.$transaction(async (tx) => {
     const client = await tx.client.findFirst({
-      where: { id: clientId, organizationId: tenantId },
+      where: { id: clientId, organizationId: tenantId, active: true },
       select: { id: true },
     });
     if (!client) throw new Error("Cliente no encontrado");
