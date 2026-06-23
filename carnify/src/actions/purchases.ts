@@ -87,7 +87,7 @@ export async function createPurchase(data: z.infer<typeof PurchaseSchema>) {
     const productIds = parsed.items.map((i) => i.productId);
     // C4: filtrar por tenant para evitar tocar productos de otra organización.
     const dbProducts = await tx.product.findMany({
-      where: { id: { in: productIds }, organizationId: tenantId },
+      where: { id: { in: productIds }, organizationId: tenantId, active: true },
       select: { id: true, name: true },
     });
     if (dbProducts.length !== new Set(productIds).size) {

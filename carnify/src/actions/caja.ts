@@ -212,7 +212,7 @@ export async function recordSale(
   const productIds = [...new Set(parsedItems.flatMap((i) => (i.productId ? [i.productId] : [])))];
   if (productIds.length > 0) {
     const dbProducts = await prisma.product.findMany({
-      where: { id: { in: productIds }, organizationId: tenantId },
+      where: { id: { in: productIds }, organizationId: tenantId, active: true },
       select: { id: true, price: true, discountPercent: true, discountEndDate: true },
     });
     const productById = new Map(dbProducts.map((p) => [p.id, p]));
@@ -253,7 +253,7 @@ export async function recordSale(
     const txEnforceStock = txSettings?.enforceStock ?? true;
 
     const txProducts = await tx.product.findMany({
-      where: { id: { in: productIds }, organizationId: tenantId },
+      where: { id: { in: productIds }, organizationId: tenantId, active: true },
       select: { id: true, price: true, discountPercent: true, discountEndDate: true },
     });
     const txProductById = new Map(txProducts.map((product) => [product.id, product]));

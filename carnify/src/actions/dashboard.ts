@@ -55,7 +55,7 @@ export async function getDashboardStats() {
       select: { total: true, timestamp: true },
     }),
     prisma.product.findMany({
-      where: { organizationId: tenantId },
+      where: { organizationId: tenantId, active: true },
       include: { cost: true },
       orderBy: { name: "asc" },
     }),

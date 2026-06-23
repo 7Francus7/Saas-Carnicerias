@@ -32,14 +32,14 @@ export async function getInventory() {
   const { tenantId } = await requireTenantAndSection("inventario");
 
   const items = await prisma.inventoryItem.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, product: { active: true } },
     include: { product: { select: { id: true, name: true, emoji: true, price: true, unit: true } } },
     orderBy: { product: { name: "asc" } },
   });
 
   const productIdsWithStock = new Set(items.map((i) => i.productId));
   const products = await prisma.product.findMany({
-    where: { organizationId: tenantId, id: { notIn: Array.from(productIdsWithStock) } },
+    where: { organizationId: tenantId, active: true, id: { notIn: Array.from(productIdsWithStock) } },
     select: { id: true, name: true, emoji: true, price: true, unit: true },
   });
 
@@ -61,7 +61,7 @@ export async function getInventory() {
 export async function getInventoryForPos() {
   const { tenantId } = await requireTenantAndSection("pos");
   return prisma.inventoryItem.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, product: { active: true } },
     select: {
       productId: true,
       quantity: true,

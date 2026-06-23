@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 export async function getCostos() {
   const { tenantId } = await requireTenantAndSection("costos");
   return prisma.productCost.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, product: { active: true } },
     include: { product: true },
   });
 }
@@ -15,7 +15,7 @@ export async function getCostos() {
 export async function upsertCosto(productId: string, cost: number) {
   const { tenantId } = await requireTenantAndSection("costos");
   // Verify product belongs to tenant
-  const product = await prisma.product.findFirst({ where: { id: productId, organizationId: tenantId } });
+  const product = await prisma.product.findFirst({ where: { id: productId, organizationId: tenantId, active: true } });
   if (!product) throw new Error("Producto no encontrado");
 
   await prisma.productCost.upsert({

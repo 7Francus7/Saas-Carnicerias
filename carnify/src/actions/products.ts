@@ -22,7 +22,7 @@ const ProductSchema = z.object({
 export async function getProducts() {
   const { tenantId } = await requireTenantAndSection("productos");
   return prisma.product.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, active: true },
     orderBy: { name: "asc" },
   });
 }
@@ -30,7 +30,7 @@ export async function getProducts() {
 export async function getProductsWithCost() {
   const { tenantId } = await requireTenantAndSection("productos");
   return prisma.product.findMany({
-    where: { organizationId: tenantId },
+    where: { organizationId: tenantId, active: true },
     include: { cost: true },
     orderBy: { name: "asc" },
   });
@@ -39,6 +39,26 @@ export async function getProductsWithCost() {
 export async function createProduct(data: z.infer<typeof ProductSchema>) {
   const { tenantId } = await requireTenantAndSection("productos");
   const parsed = ProductSchema.parse(data);
+
+  // PLU opción (b): la unicidad [organizationId, plu] cuenta inactivos, así que un
+  // producto soft-deleted con el mismo PLU bloquearía el alta. Si existe, lo
+  // reactivamos y sobreescribimos con los datos nuevos en vez de crear un duplicado.
+  const inactiveSamePlu = await prisma.product.findFirst({
+    where: { organizationId: tenantId, plu: parsed.plu, active: false },
+    select: { id: true },
+  });
+  if (inactiveSamePlu) {
+    const product = await prisma.product.update({
+      where: { id: inactiveSamePlu.id },
+      data: { ...parsed, active: true },
+      include: { cost: true },
+    });
+    revalidatePath("/productos");
+    revalidatePath("/costos");
+    revalidatePath("/pos");
+    return product;
+  }
+
   const product = await prisma.product.create({
     data: { ...parsed, organizationId: tenantId },
     include: { cost: true },
@@ -62,7 +82,13 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof Pro
 
 export async function deleteProduct(id: string) {
   const { tenantId } = await requireTenantAndSection("productos");
-  await prisma.product.deleteMany({ where: { id, organizationId: tenantId } });
+  // Soft-delete: marcar inactivo en vez de borrar. Preserva el vínculo con el
+  // historial (SaleItem/StockMovement/PurchaseItem) y evita el fallo FK Restrict
+  // de PurchaseItem.product al borrar un producto ya comprado.
+  await prisma.product.updateMany({
+    where: { id, organizationId: tenantId },
+    data: { active: false },
+  });
   revalidatePath("/productos");
   revalidatePath("/pos");
 }
