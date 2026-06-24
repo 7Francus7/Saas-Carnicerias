@@ -15,6 +15,18 @@ const SupplierSchema = z.object({
   notes: z.string().default(""),
 });
 
+// Update parcial: opcionales SIN default (no blanquear campos no enviados).
+// Excluye organizationId/status/createdAt (no editables por este path).
+const SupplierUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  contactName: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  address: z.string().optional(),
+  cuit: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 const PurchaseItemInputSchema = z.object({
   productId: z.string().min(1),
   quantity: z.number().positive(),
@@ -52,7 +64,10 @@ export async function createSupplier(data: z.infer<typeof SupplierSchema>) {
 
 export async function updateSupplier(id: string, data: Partial<z.infer<typeof SupplierSchema>>) {
   const { tenantId } = await requireTenantAndSection("compras");
-  await prisma.supplier.updateMany({ where: { id, organizationId: tenantId }, data });
+  // Validar: solo campos del schema. Evita mass-assignment de organizationId/status
+  // vía llamada cruda fuera de la UI.
+  const parsed = SupplierUpdateSchema.parse(data);
+  await prisma.supplier.updateMany({ where: { id, organizationId: tenantId }, data: parsed });
   revalidatePath("/compras");
 }
 

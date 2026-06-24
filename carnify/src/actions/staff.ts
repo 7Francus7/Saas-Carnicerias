@@ -19,6 +19,22 @@ const StaffSchema = z.object({
   hireDate: z.coerce.date(),
 });
 
+// Update parcial: opcionales SIN default (no blanquear campos no enviados).
+// Excluye organizationId/memberId/createdAt (no editables por este path).
+const StaffUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  dni: z.string().optional(),
+  phone: z.string().optional(),
+  role: z.enum(["carnicero", "cajero", "ayudante", "encargado", "limpieza"]).optional(),
+  address: z.string().optional(),
+  email: z.string().optional(),
+  notes: z.string().optional(),
+  salary: z.number().optional(),
+  schedule: z.string().optional(),
+  status: z.enum(["active", "inactive", "vacations", "suspended"]).optional(),
+  hireDate: z.coerce.date().optional(),
+});
+
 export async function getStaff() {
   const { tenantId } = await requireTenantAndSection("personal");
   return prisma.staff.findMany({
@@ -40,7 +56,10 @@ export async function createStaff(data: z.infer<typeof StaffSchema>) {
 
 export async function updateStaff(id: string, data: Partial<z.infer<typeof StaffSchema>>) {
   const { tenantId } = await requireTenantAndSection("personal");
-  await prisma.staff.updateMany({ where: { id, organizationId: tenantId }, data });
+  // Validar: solo campos del schema. Evita mass-assignment de organizationId
+  // (mover registro a otro tenant) o memberId (vínculo cruzado) vía llamada cruda.
+  const parsed = StaffUpdateSchema.parse(data);
+  await prisma.staff.updateMany({ where: { id, organizationId: tenantId }, data: parsed });
   revalidatePath("/personal");
 }
 

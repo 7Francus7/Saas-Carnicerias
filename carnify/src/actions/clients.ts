@@ -16,6 +16,19 @@ const ClientSchema = z.object({
   status: z.enum(["active", "overdue", "blocked"]).default("active"),
 });
 
+// Update parcial: campos opcionales SIN default, para no blanquear los que no se
+// envían. Excluye balance/active/organizationId/createdAt (no editables por este path).
+const ClientUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  dni: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  email: z.string().optional(),
+  notes: z.string().optional(),
+  creditLimit: z.number().optional(),
+  status: z.enum(["active", "overdue", "blocked"]).optional(),
+});
+
 export async function getClients() {
   const { tenantId } = await requireTenantAndSection("clientes");
   return prisma.client.findMany({
@@ -72,7 +85,11 @@ export async function createClient(data: z.infer<typeof ClientSchema>) {
 
 export async function updateClient(id: string, data: Partial<z.infer<typeof ClientSchema>>) {
   const { tenantId } = await requireTenantAndSection("clientes");
-  await prisma.client.updateMany({ where: { id, organizationId: tenantId }, data });
+  // Validar contra el schema: solo campos editables. Evita mass-assignment de
+  // balance/active/organizationId/createdAt vía DevTools o llamada cruda — el
+  // balance solo se mueve por addPayment/recordSale, nunca por edición directa.
+  const parsed = ClientUpdateSchema.parse(data);
+  await prisma.client.updateMany({ where: { id, organizationId: tenantId }, data: parsed });
   revalidatePath("/clientes");
 }
 

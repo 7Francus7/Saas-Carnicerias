@@ -3,6 +3,22 @@
 import { prisma } from "@/lib/db";
 import { requireTenant, requireTenantAndSection } from "./_helpers";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+// Solo campos de negocio editables. Excluye organizationId/id para evitar
+// mass-assignment (mover settings a otro tenant) vía llamada cruda.
+const SettingsSchema = z.object({
+  nombre: z.string(),
+  iniciales: z.string(),
+  direccion: z.string(),
+  telefono: z.string(),
+  cuit: z.string(),
+  email: z.string(),
+  defaultPaymentMethod: z.string(),
+  stockAlertThreshold: z.number().int().nonnegative(),
+  requireConfirmOnCheckout: z.boolean(),
+  enforceStock: z.boolean(),
+}).partial();
 
 export async function getSettings() {
   const { tenantId } = await requireTenantAndSection("config");
@@ -60,10 +76,11 @@ export async function updateSettings(data: {
   enforceStock?: boolean;
 }) {
   const { tenantId } = await requireTenantAndSection("config");
+  const parsed = SettingsSchema.parse(data);
   await prisma.businessSettings.upsert({
     where: { organizationId: tenantId },
-    create: { organizationId: tenantId, ...data },
-    update: data,
+    create: { organizationId: tenantId, ...parsed },
+    update: parsed,
   });
   revalidatePath("/config");
   revalidatePath("/");
