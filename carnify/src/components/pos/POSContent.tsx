@@ -188,9 +188,11 @@ export default function POSContent() {
 
   const getAvailableStock = useCallback((productId: string) => {
     const inventory = inventoryByProduct[productId];
-    if (!inventory) return posSettings.enforceStock ? 0 : null;
+    // Sin registro de inventario => no bloquear la venta (carnicería que aún
+    // no cargó stock). enforceStock solo aplica cuando hay inventario real.
+    if (!inventory) return null;
     return inventory.quantity - (reservedQuantityByProduct[productId] ?? 0);
-  }, [inventoryByProduct, posSettings.enforceStock, reservedQuantityByProduct]);
+  }, [inventoryByProduct, reservedQuantityByProduct]);
 
   const validateStockAvailability = useCallback((product: Product, requestedQuantity: number) => {
     if (!posSettings.enforceStock) return null;

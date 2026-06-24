@@ -386,11 +386,14 @@ export async function recordSale(
         where: { productId: item.productId },
       });
 
-      if (txEnforceStock) {
-        if (!existingInventory || existingInventory.quantity < item.quantity) {
-          const available = existingInventory?.quantity ?? 0;
+      // enforceStock solo aplica a productos con inventario cargado. Sin registro
+      // => producto no trackeado (carnicería que aún no carga stock): se vende
+      // libremente y se trackea en negativo, consistente con el POS (getAvailableStock).
+      if (txEnforceStock && existingInventory) {
+        if (existingInventory.quantity < item.quantity) {
+          const available = existingInventory.quantity;
           throw new Error(
-            `Stock insuficiente para ${item.name}. Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory?.unit ?? item.unit}.`
+            `Stock insuficiente para ${item.name}. Disponible: ${available.toFixed(item.unit === "kg" ? 3 : 0)} ${existingInventory.unit ?? item.unit}.`
           );
         }
 
