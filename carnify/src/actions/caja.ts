@@ -91,14 +91,28 @@ export async function closeCaja(realAmounts: Record<string, number>) {
   const { tenantId, userId } = await requireTenantAndSection("caja");
 
   await prisma.$transaction(async (tx) => {
-    // M3: leer la sesión + ventas + movimientos DENTRO de la transacción de cierre,
-    // para que el teórico refleje exactamente el estado al momento de cerrar. Antes
-    // se calculaba sobre una lectura previa a la $transaction y una venta concurrente
-    // que entrara entre el cálculo y el cierre quedaba fuera del teórico persistido.
-    // Esta misma lectura (closedAt: null) cubre el doble-cierre: si otra caja ya cerró,
-    // devuelve null → "No hay caja abierta".
+    // M1: tomar un lock EXCLUSIVO (FOR UPDATE) sobre la fila de la sesión abierta
+    // antes de leer ventas y calcular el teórico. recordSale toma un lock
+    // COMPARTIDO (FOR SHARE) sobre esa misma fila, así que:
+    //  - una venta en vuelo retrasa el cierre hasta que commitea (y entonces queda
+    //    incluida en el teórico),
+    //  - una venta que llega mientras cerramos espera; al liberarse, la fila ya
+    //    tiene closedAt y deja de matchear → recibe "No hay caja abierta".
+    // Esto cierra la carrera donde una venta concurrente quedaba asociada a la
+    // caja cerrada pero fuera del teórico persistido. El propio lock + el filtro
+    // closedAt IS NULL también cubre el doble-cierre.
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "caja_session"
+      WHERE "organizationId" = ${tenantId} AND "closedAt" IS NULL
+      FOR UPDATE
+    `;
+    if (locked.length === 0) throw new Error("No hay caja abierta");
+
+    // M3: leer la sesión + ventas + movimientos DENTRO de la transacción de cierre
+    // (ya con la fila bloqueada) para que el teórico refleje exactamente el estado
+    // al momento de cerrar.
     const session = await tx.cajaSession.findFirst({
-      where: { organizationId: tenantId, closedAt: null },
+      where: { id: locked[0].id, organizationId: tenantId, closedAt: null },
       include: {
         sales: { where: { status: "active" }, include: { splits: true } },
         transactions: true,
@@ -147,7 +161,7 @@ export async function closeCaja(realAmounts: Record<string, number>) {
         diffAmount: diffTotal,
       },
     });
-  });
+  }, { isolationLevel: "Serializable" });
 
   revalidatePath("/caja");
   revalidatePath("/");
@@ -245,11 +259,21 @@ export async function recordSale(
   }
 
   const runSale = () => prisma.$transaction(async (tx) => {
-    const [txSession, txSettings] = await Promise.all([
-      tx.cajaSession.findFirst({ where: { organizationId: tenantId, closedAt: null } }),
+    // M1: lock COMPARTIDO (FOR SHARE) sobre la sesión abierta. Varias ventas
+    // concurrentes pueden mantenerlo a la vez (no se bloquean entre sí), pero
+    // entra en conflicto con el FOR UPDATE de closeCaja: mientras esta venta no
+    // commitee, el cierre espera (y la incluye en el teórico); si la caja ya cerró,
+    // la fila deja de matchear closedAt IS NULL → "No hay caja abierta".
+    const [lockedSessions, txSettings] = await Promise.all([
+      tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "caja_session"
+        WHERE "organizationId" = ${tenantId} AND "closedAt" IS NULL
+        FOR SHARE
+      `,
       tx.businessSettings.findUnique({ where: { organizationId: tenantId }, select: { enforceStock: true } }),
     ]);
-    if (!txSession) throw new Error("No hay caja abierta");
+    if (lockedSessions.length === 0) throw new Error("No hay caja abierta");
+    const txSessionId = lockedSessions[0].id;
     const txEnforceStock = txSettings?.enforceStock ?? true;
 
     const txProducts = await tx.product.findMany({
@@ -297,7 +321,7 @@ export async function recordSale(
 
     const newSale = await tx.sale.create({
       data: {
-        sessionId: txSession.id,
+        sessionId: txSessionId,
         total: parsedSale.total,
         method,
         itemCount: parsedItems.length,
